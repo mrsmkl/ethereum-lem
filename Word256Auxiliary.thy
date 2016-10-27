@@ -74,7 +74,7 @@ lemma boolListFromWord256_def_lemma:
 " ((\<forall> w.
    boolListFrombitSeq (( 256 :: nat))
      ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w) = 
-   to_bl w)) "
+   of_bl w)) "
 (* Theorem: boolListFromWord256_def_lemma*)(* try *) by auto
 
 lemma word256FromNumeral_def_lemma:
@@ -184,10 +184,6 @@ lemma word256Lsr_def_lemma:
 lemma word256Lsl_def_lemma:
 " (( word256NatOp bitSeqShiftLeft = (op<<))) "
 (* Theorem: word256Lsl_def_lemma*)(* try *) by auto
-
-lemma word256UGT_def_lemma:
-" ((\<forall> a. \<forall> b. (unat a > unat b) = a > b)) "
-(* Theorem: word256UGT_def_lemma*)(* try *) by auto
 
 
 

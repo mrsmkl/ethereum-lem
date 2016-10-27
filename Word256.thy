@@ -297,7 +297,4 @@ definition instance_Word_WordAsr_Word256_word256_dict  :: "( 256 word)WordAsr_cl
   asr_method = (op>>>)|) )"
 
 
-(*val word256UGT : word256 -> word256 -> bool*)
-(*let word256UGT a b=  (Instance_Basic_classes_Ord_nat.>) (word256ToNat a) (word256ToNat b)*)
-
 end
