@@ -515,10 +515,10 @@ record program =
 
 
 (*val store_byte_list_in_program : nat -> list byte -> map nat inst -> map nat inst*)
-function (sequential,domintros)  store_byte_list_in_program  :: " nat \<Rightarrow>( 8 word)list \<Rightarrow>((nat),(inst))Map.map \<Rightarrow>((nat),(inst))Map.map "  where 
+fun  store_byte_list_in_program  :: " nat \<Rightarrow>( 8 word)list \<Rightarrow>((nat),(inst))Map.map \<Rightarrow>((nat),(inst))Map.map "  where 
      " store_byte_list_in_program pos ([]) orig = ( orig )"
 |" store_byte_list_in_program pos (h # t) orig = ( store_byte_list_in_program (pos +( 1 :: nat)) t (map_update pos (Unknown h) orig))" 
-by pat_completeness auto
+declare store_byte_list_in_program.simps [simp del]
 
 
 (*val program_content_of_lst : nat -> list inst -> map nat inst*)

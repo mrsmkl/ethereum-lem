@@ -20,8 +20,6 @@ begin
 (*                                                  *)
 (****************************************************)
 
-termination store_byte_list_in_program by lexicographic_order
-
 termination store_byte_list_memory by lexicographic_order
 
 

@@ -434,6 +434,7 @@ let rec store_byte_list_in_program pos lst orig = match lst with
  | [] -> orig
  | h :: t -> store_byte_list_in_program (pos + 1) t (Map.insert pos (Unknown h) orig)
 end
+declare termination_argument store_byte_list_in_program = automatic
 
 val program_content_of_lst : nat -> list inst -> map nat inst
 let rec program_content_of_lst pos lst = match lst with
