@@ -1,0 +1,163 @@
+(*
+  Copyright 2016 Sami Mäkelä
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
+open import Pervasives
+open import Word256
+open import Word8
+
+type privkey = word256
+
+type pubkey = <|
+  x: word256;
+  y: word256;
+|>
+
+type signature = <|
+  v : word8;
+  r : word256;
+  s : word256;
+|>
+
+val p : int
+let p = 2**256 - 2**32 - 2**9 - 2**8 - 2**7 - 2**6 - 2**4 - 1
+
+type point = Infinity | Point of int * int
+
+let rec int_from_list lst = match lst with
+ | [] -> 0
+ | a::lst -> (a:int) + 2**32 * int_from_list lst
+end
+
+let gx : list int = [0X79BE667E; 0XF9DCBBAC; 0X55A06295; 0XCE870B07; 0X029BFCDB; 0X2DCE28D9; 0X59F2815B; 0X16F81798]
+let gy : list int = [0X483ADA77; 0X26A3C465; 0X5DA4FBFC; 0X0E1108A8; 0XFD17B448; 0XA6855419; 0X9C47D08F; 0XFB10D4B8]
+
+val g : point
+let g = Point (int_from_list (List.reverse gx)) (int_from_list (List.reverse gy))
+
+val a : int
+let a = 0
+
+val b : int
+let b = 7
+
+val h : int
+let h = 1
+
+val n : int
+let n = int_from_list (List.reverse [0XFFFFFFFF; 0XFFFFFFFF; 0XFFFFFFFF; 0XFFFFFFFE; 0XBAAEDCE6; 0XAF48A03B; 0XBFD25E8C; 0XD0364141])
+
+let normalize_aux (x : int) = if x < 0 then p + x else x
+
+val normalize : point -> point
+let normalize r = match r with
+ | Infinity -> Infinity
+ | Point x_r y_r -> Point (normalize_aux x_r) (normalize_aux y_r) 
+end
+
+val is_point : point -> bool
+let is_point r = match r with
+ | Infinity -> true
+ | Point x y ->
+    let a = (y ** 2) mod p in
+    let b = ((x ** 3) + (a * x) + b) mod p in
+    a = b
+end
+
+val find_inverse : int -> nat -> int -> int
+let rec find_inverse a n p = match n with
+  | 0 -> 0
+  | n+1 -> if (intFromNat n) * a mod p = 1 then intFromNat n else find_inverse a n p
+end
+
+val inverse : int -> int -> int
+let inverse a p = find_inverse a (natFromInt p) p
+
+val double_point : point -> point
+let double_point r = match r with
+ | Infinity -> Infinity
+ | Point x y ->
+   if y = 0 then Infinity else
+   let a = (3 * (x ** 2) + a) mod p in
+   let b = (inverse (y + y) p) mod p in
+   let s = a * b mod p in
+   let x_r = ((s ** 2) - (x + x)) mod p in
+   let y_r = (~y + (s * (x - x_r))) mod p in
+   normalize (Point x_r y_r)
+end
+
+val add_point : point -> point -> point
+let add_point r1 r2 = match (r1, r2) with
+ | (_, Infinity) -> r1
+ | (Infinity, _) -> r2
+ | (Point x1 y1, Point x2 y2) ->
+     if x1 = x2 && y1 = y2 then double_point r1 else
+     let s = ((y2 - y1) * (inverse (x2 - x1) p)) mod p in
+     let xf = ((s ** 2) - x1 - x2) mod p in
+     let yf = (s * (x1 - xf) - y1) mod p in
+     normalize (Point xf yf)
+end
+
+val multiply_point : point -> nat -> point
+let rec multiply_point p n = match n with
+ | 0 -> Infinity
+ | n+1 -> add_point p (multiply_point p n)
+end
+
+let rec sign_aux rnd_k e sk =
+  (* let k = random_big_int curve_n in do we need to check that k is invertible ? *)
+  match multiply_point g (natFromInt rnd_k) with
+  | Infinity -> Nothing 
+  | Point x1 _ ->
+     let r = x1 mod n in
+     if r = 0 then Nothing else 
+     let inv_k = inverse rnd_k n in
+     let s = (inv_k * (e + sk * r)) mod n in
+     if s = 0 then Nothing else Just (r, s)
+end
+
+val pubkey : privkey -> pubkey
+val sign : word256 -> privkey -> signature
+
+val find_finite : (nat -> bool) -> nat -> list nat
+let rec find_finite pred n = match n with
+ | 0 -> []
+ | n+1 ->
+   let rest = find_finite pred n in
+   if pred n then n :: rest else rest
+end
+
+val sqrt_mod : int -> int -> list int
+let sqrt_mod n p = List.map intFromNat (find_finite (fun a -> a*a mod (natFromInt p) = natFromInt n) (natFromInt p))
+
+val point_from_x : int -> bool -> point
+let point_from_x x is_odd =
+  let y2 = (x**3 + a*x + b) mod p in
+  match List.find (fun y -> (y mod 2 = 1) = is_odd) (sqrt_mod y2 p) with
+  | Nothing -> Infinity
+  | Just a -> Point x a
+  end
+
+val recover : word256 -> signature -> pubkey
+let recover hash sig =
+  let is_y_odd = if sig.v = 27 then false else true in
+  let pr = point_from_x (intFromNat (word256ToNat sig.r)) is_y_odd in
+  let r_inv = inverse (intFromNat (word256ToNat sig.r)) n in
+  let s1 = (word256ToNat hash * natFromInt r_inv) mod natFromInt n in
+  let s2 = (word256ToNat sig.s * natFromInt r_inv) mod natFromInt n in
+  match add_point (multiply_point g s1) (multiply_point pr s2) with
+  | Infinity -> <| x = 0; y = 0 |>
+  | Point x y -> <| x = word256FromNat (natFromInt x); y = word256FromNat (natFromInt y) |>
+  end
+

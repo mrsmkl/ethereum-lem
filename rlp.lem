@@ -20,6 +20,8 @@ open import Word256
 open import Word160
 open import Word8
 
+type byte = word8
+
 type tree =
  | Leaf of list byte
  | Node of list tree
@@ -89,3 +91,38 @@ end
 val RLP_nat : nat -> list byte
 let RLP_nat i = RLP (Leaf (BE i))
 
+val decode : list byte -> maybe (tree * list byte)
+val decode_n : nat -> list byte -> maybe (list tree * list byte)
+let rec decode lst = match lst with
+ | [] -> Nothing
+ | k::lst ->
+   if k > 247 then
+     match read_n_bytes (word8ToNat k - 247) lst with
+       | Nothing -> Nothing
+       | Just (be_bytes, rest) ->
+         let list_len = BD be_bytes in
+         match decode_n list_len rest with
+         | Nothing -> Nothing
+         | Just (lst, rest) -> Just (Node lst, rest)
+         end
+      end
+    else if k > 192 then
+         let list_len = word8ToNat k - 192 in
+         match decode_n list_len lst with
+         | Nothing -> Nothing
+         | Just (lst, rest) -> Just (Node lst, rest)
+         end
+    else Nothing
+end
+and decode_n n lst = match n with
+ | 0 -> Just ([], lst)
+ | n+1 ->
+    match decode lst with
+    | Nothing -> Nothing
+    | Just (t, left) ->
+      match decode_n n left with
+      | Nothing -> Nothing
+      | Just (lst, left) -> Just (t::lst, left)
+      end
+    end
+end

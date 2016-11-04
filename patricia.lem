@@ -1,0 +1,106 @@
+(*
+  Copyright 2016 Sami Mäkelä
+
+   Licensed under the Apache License; Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing; software
+   distributed under the License is distributed on an "AS IS" BASIS;
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND; either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
+
+open import Pervasives
+open import Word
+open import Word8
+open import Rlp
+open import Keccak
+import Evm
+
+type byte = word8
+type nibble = N0 | N1 | N2 | N3 | N4 | N5 | N6 | N7 | N8 | N9 | Na | Nb | Nc | Nd | Ne | Nf
+
+val HP_f : bool -> byte
+let HP_f b = if b then 2 else 0
+
+val nibble_to_byte : nibble -> byte
+let nibble_to_byte n = match n with
+ | N0 -> 0
+ | N1 -> 1
+ | N2 -> 2
+ | N3 -> 3
+ | N4 -> 4
+ | N5 -> 5
+ | N6 -> 6
+ | N7 -> 7
+ | N8 -> 8
+ | N9 -> 9
+ | Na -> 10
+ | Nb -> 11
+ | Nc -> 12
+ | Nd -> 13
+ | Ne -> 14
+ | Nf -> 15
+end
+
+val HP_raw : list nibble -> list byte
+let rec HP_raw lst = match lst with
+ | [] -> []
+ | [x] -> [nibble_to_byte x]
+ | (a :: b :: rest) -> (nibble_to_byte a * 16 + nibble_to_byte b) :: HP_raw rest
+end
+
+val HP : list nibble -> bool -> list byte
+let HP lst t = match lst with
+ | [] -> [16 * (HP_f t)]
+ | hd::tl ->
+  if length lst mod 2 = 0 then (16 * (HP_f t)) :: HP_raw lst
+  else (16 * (1 + HP_f t) + nibble_to_byte hd) :: HP_raw tl
+end
+
+type jott = list (list byte * list byte)
+
+val MP_I0 : jott -> nat -> list byte
+let MP_I0 j i = match index j i with
+ | Nothing -> []
+ | Just (a,_) -> a
+end
+
+val MP_I1 : jott -> nat -> list byte
+let MP_I1 j i = match index j i with
+ | Nothing -> []
+ | Just (_,a) -> a
+end
+
+type MPTree =
+ | MPLeaf of list nibble * list byte
+ | MPExt of  list nibble * MPTree
+ | MPBranch of list (maybe MPTree) * list byte
+
+val MP_n : maybe MPTree -> list byte
+val MP_c : MPTree -> list byte
+let rec MP_n opt = match opt with
+ | Nothing -> []
+ | Just t ->
+     let content = MP_c t in
+     if length content < 32 then content
+     else Evm.word_rsplit (keccak content)
+end
+and MP_c l = match l with
+| MPLeaf I0 I1 -> RLP(Node [Leaf (HP I0 true); Leaf (I1)])
+| MPExt I0part cont ->
+    RLP(Node [Leaf (HP I0part false); Leaf (MP_n (Just cont))])
+| MPBranch subs content ->
+    RLP(Node ((map (fun sub -> Leaf (MP_n sub)) subs) ++ [Leaf content]))
+end
+
+val TRIE : maybe MPTree -> Evm.uint
+let TRIE t = match t with
+ | Nothing -> keccak []
+ | Just tree -> keccak (MP_c tree)
+end
+

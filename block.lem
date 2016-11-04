@@ -14,17 +14,22 @@
    limitations under the License.
 *)
 open import Pervasives
+open import Word256
 (*
 open import Word
-open import Word256
 open import Word160
 open import Word8
 *)
+open import Ecdsa
+open import Rlp
+open import Keccak
 open import Evm
 
 type transaction = <|
   tr_from : address;
-  tr_to : maybe address;
+  (* tr_to : maybe address; *)
+  tr_to : address;
+  tr_value : uint;
   tr_gas_limit : uint;
   tr_gas_price : uint;
   tr_nonce : uint;
@@ -60,4 +65,37 @@ type block = <|
   block_nonce : uint;
 |>
 
+val address_of_pubkey : Ecdsa.pubkey -> address
+let address_of_pubkey key =
+  uint_to_address (keccak (word_rsplit key.x ++ word_rsplit key.y))
+
+val message_hash : transaction -> uint
+let message_hash tr =
+  let i num = Leaf (BE (absnat num)) in
+  keccak (RLP (Node [i tr.tr_nonce; i tr.tr_gas_price; i tr.tr_gas_limit; Leaf (address_to_bytes tr.tr_to); i tr.tr_value; Leaf tr.tr_data]))
+
+val transaction_to_rlp : privkey -> transaction -> list byte
+let transaction_to_rlp key tr =
+  let i num = Leaf (BE (absnat num)) in
+  let sig = Ecdsa.sign (message_hash tr) key in
+  RLP (Node [i tr.tr_nonce; i tr.tr_gas_price; i tr.tr_gas_limit; Leaf (address_to_bytes tr.tr_to); i tr.tr_value; Leaf tr.tr_data; Leaf [sig.v];
+                     Leaf (word_rsplit sig.r); Leaf (word_rsplit sig.s)])
+  
+val rlp_to_transaction : list byte -> maybe transaction
+let rlp_to_transaction lst = match decode lst with
+ | Just (Node [Leaf nonce; Leaf gas_price; Leaf gas_limit; Leaf tr_to; Leaf value; Leaf data; Leaf [v]; Leaf r; Leaf s],[]) ->
+    let i lst = word256FromNat (BD lst) in
+    let pre = <|
+      tr_nonce = i nonce;
+      tr_gas_price = i gas_price;
+      tr_gas_limit = i gas_limit;
+      tr_to = address_of_bytes tr_to;
+      tr_value = i value;
+      tr_data = data;
+      tr_from = 0;
+     |> in
+    let sig = <| v = v; r = word_of_bytes r; s = word_of_bytes s |> in
+    Just <| pre with tr_from = address_of_pubkey (recover (message_hash pre) sig) |>
+ | _ -> Nothing
+end
 
