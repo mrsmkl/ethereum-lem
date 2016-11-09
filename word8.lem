@@ -13,33 +13,47 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 *)
+
 open import Pervasives
 open import Word
 
-type word8 = W8 of bool * list bool
+type word8 = W8 of integer
 declare isabelle target_rep type word8 = `word` 8
 
 (* perhaps should truncate here? *)
 val bs_to_w8 : bitSequence -> word8
-let bs_to_w8 seq = match resizeBitSeq (Just 8) seq with
- | BitSeq _ s b -> W8 s b
-end
+let bs_to_w8 seq = W8 (integerFromBitSeq seq)
 declare isabelle target_rep function bs_to_w8 = (fun w -> `word_of_int` (integerFromBitSeq w))
 
 val w8_to_bs : word8 -> bitSequence
-let w8_to_bs (W8 s b) = BitSeq (Just 8) s b
+let w8_to_bs (W8 i) = bitSeqFromInteger (Just 8) i
 
-val word8BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word8 -> word8 -> 'a
-let word8BinTest binop w1 w2 = binop (w8_to_bs w1) (w8_to_bs w2)
+val base : integer
+let base = 2**8
 
-val word8BinOp : (bitSequence -> bitSequence -> bitSequence) -> word8 -> word8 -> word8
-let word8BinOp binop w1 w2 = bs_to_w8 (binop (w8_to_bs w1) (w8_to_bs w2))
+val word8BinTest : forall 'a. (integer -> integer -> 'a) -> word8 -> word8 -> 'a
+let word8BinTest binop (W8 w1) (W8 w2) = binop (w1 mod base) (w2 mod base)
 
-val word8NatOp : (bitSequence -> nat -> bitSequence) -> word8 -> nat -> word8
-let word8NatOp binop w1 n = bs_to_w8 (binop (w8_to_bs w1) n)
+val word8BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word8 -> word8 -> 'a
+let word8BBinTest binop w1 w2 = binop (w8_to_bs w1) (w8_to_bs w2)
 
-val word8UnaryOp : (bitSequence -> bitSequence) -> word8 -> word8
-let word8UnaryOp op w = bs_to_w8 (op (w8_to_bs w))
+val word8BinOp : (integer -> integer -> integer) -> word8 -> word8 -> word8
+let word8BinOp binop (W8 w1) (W8 w2) = W8 (binop (w1 mod base) (w2 mod base) mod base)
+
+val word8BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word8 -> word8 -> word8
+let word8BBinOp binop w1 w2 = bs_to_w8 (binop (w8_to_bs w1) (w8_to_bs w2))
+
+val word8NatOp : (integer -> nat -> integer) -> word8 -> nat -> word8
+let word8NatOp binop (W8 w1) n = W8  (binop (w1 mod base) n mod base)
+
+val word8BNatOp : (bitSequence -> nat -> bitSequence) -> word8 -> nat -> word8
+let word8BNatOp binop w1 n = bs_to_w8 (binop (w8_to_bs w1) n)
+
+val word8BUnaryOp : (bitSequence -> bitSequence) -> word8 -> word8
+let word8BUnaryOp op w = bs_to_w8 (op (w8_to_bs w))
+
+val word8UnaryOp : (integer -> integer) -> word8 -> word8
+let word8UnaryOp op (W8 w) = W8 (op w mod base)
 
 val word8ToNat : word8 -> nat
 let word8ToNat w = natFromInteger (integerFromBitSeq (w8_to_bs w))
@@ -52,11 +66,11 @@ declare isabelle target_rep function word8ToInt = `sint`
 declare isabelle target_rep function w8_to_bs = (fun w -> bitSeqFromInteger (Just 8) (integerFromInt (word8ToInt w)))
 
 val word8FromInteger : integer -> word8
-let word8FromInteger i = bs_to_w8 (bitSeqFromInteger (Just 8) i)
+let word8FromInteger i = W8 (i mod base)
 declare isabelle target_rep function word8FromInteger = (fun i -> `word_of_int` (intFromInteger i))
 
 val word8FromInt : int -> word8
-let word8FromInt i = bs_to_w8 (bitSeqFromInteger (Just 8) (integerFromInt i))
+let word8FromInt i = W8 (integerFromInt i mod base)
 declare isabelle target_rep function word8FromInt = `word_of_int`
 
 val word8FromNat : nat -> word8
@@ -74,7 +88,7 @@ let boolListFromWord8 w = boolListFrombitSeq 8 (w8_to_bs w)
 declare isabelle target_rep function boolListFromWord8 = `to_bl`
 
 val word8FromNumeral : numeral -> word8
-let word8FromNumeral w = bs_to_w8 (fromNumeral w)
+let word8FromNumeral w = W8 (integerFromNumeral w mod base)
 
 instance (Numeral word8)
   let fromNumeral = word8FromNumeral
@@ -248,6 +262,10 @@ end
 instance (WordAsr word8)
   let (asr) = word8Asr
 end
+
+val word8UGT : word8 -> word8 -> bool
+let word8UGT a b = word8ToNat a > word8ToNat b
+declare isabelle target_rep function word8UGT = infix `>`
 
 declare isabelle target_rep function word8FromNumeral n = ((`word_of_int` n) : word8)
 declare isabelle target_rep function w8Less = `word_sless`

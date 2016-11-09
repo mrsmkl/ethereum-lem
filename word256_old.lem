@@ -17,43 +17,30 @@
 open import Pervasives
 open import Word
 
-type word256 = W256 of integer
+type word256 = W256 of bool * list bool
 declare isabelle target_rep type word256 = `word` 256
 
 (* perhaps should truncate here? *)
 val bs_to_w256 : bitSequence -> word256
-let bs_to_w256 seq = W256 (integerFromBitSeq seq)
+let bs_to_w256 seq = match resizeBitSeq (Just 256) seq with
+ | BitSeq _ s b -> W256 s b
+end
 declare isabelle target_rep function bs_to_w256 = (fun w -> `word_of_int` (integerFromBitSeq w))
 
 val w256_to_bs : word256 -> bitSequence
-let w256_to_bs (W256 i) = bitSeqFromInteger (Just 256) i
+let w256_to_bs (W256 s b) = BitSeq (Just 256) s b
 
-val base : integer
-let base = 2**256
+val word256BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word256 -> word256 -> 'a
+let word256BinTest binop w1 w2 = binop (w256_to_bs w1) (w256_to_bs w2)
 
-val word256BinTest : forall 'a. (integer -> integer -> 'a) -> word256 -> word256 -> 'a
-let word256BinTest binop (W256 w1) (W256 w2) = binop (w1 mod base) (w2 mod base)
+val word256BinOp : (bitSequence -> bitSequence -> bitSequence) -> word256 -> word256 -> word256
+let word256BinOp binop w1 w2 = bs_to_w256 (binop (w256_to_bs w1) (w256_to_bs w2))
 
-val word256BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word256 -> word256 -> 'a
-let word256BBinTest binop w1 w2 = binop (w256_to_bs w1) (w256_to_bs w2)
+val word256NatOp : (bitSequence -> nat -> bitSequence) -> word256 -> nat -> word256
+let word256NatOp binop w1 n = bs_to_w256 (binop (w256_to_bs w1) n)
 
-val word256BinOp : (integer -> integer -> integer) -> word256 -> word256 -> word256
-let word256BinOp binop (W256 w1) (W256 w2) = W256 (binop (w1 mod base) (w2 mod base) mod base)
-
-val word256BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word256 -> word256 -> word256
-let word256BBinOp binop w1 w2 = bs_to_w256 (binop (w256_to_bs w1) (w256_to_bs w2))
-
-val word256NatOp : (integer -> nat -> integer) -> word256 -> nat -> word256
-let word256NatOp binop (W256 w1) n = W256  (binop (w1 mod base) n mod base)
-
-val word256BNatOp : (bitSequence -> nat -> bitSequence) -> word256 -> nat -> word256
-let word256BNatOp binop w1 n = bs_to_w256 (binop (w256_to_bs w1) n)
-
-val word256BUnaryOp : (bitSequence -> bitSequence) -> word256 -> word256
-let word256BUnaryOp op w = bs_to_w256 (op (w256_to_bs w))
-
-val word256UnaryOp : (integer -> integer) -> word256 -> word256
-let word256UnaryOp op (W256 w) = W256 (op w mod base)
+val word256UnaryOp : (bitSequence -> bitSequence) -> word256 -> word256
+let word256UnaryOp op w = bs_to_w256 (op (w256_to_bs w))
 
 val word256ToNat : word256 -> nat
 let word256ToNat w = natFromInteger (integerFromBitSeq (w256_to_bs w))
@@ -66,11 +53,11 @@ declare isabelle target_rep function word256ToInt = `sint`
 declare isabelle target_rep function w256_to_bs = (fun w -> bitSeqFromInteger (Just 256) (integerFromInt (word256ToInt w)))
 
 val word256FromInteger : integer -> word256
-let word256FromInteger i = W256 (i mod base)
+let word256FromInteger i = bs_to_w256 (bitSeqFromInteger (Just 256) i)
 declare isabelle target_rep function word256FromInteger = (fun i -> `word_of_int` (intFromInteger i))
 
 val word256FromInt : int -> word256
-let word256FromInt i = W256 (integerFromInt i mod base)
+let word256FromInt i = bs_to_w256 (bitSeqFromInteger (Just 256) (integerFromInt i))
 declare isabelle target_rep function word256FromInt = `word_of_int`
 
 val word256FromNat : nat -> word256
@@ -88,7 +75,7 @@ let boolListFromWord256 w = boolListFrombitSeq 256 (w256_to_bs w)
 declare isabelle target_rep function boolListFromWord256 = `to_bl`
 
 val word256FromNumeral : numeral -> word256
-let word256FromNumeral w = W256 (integerFromNumeral w mod base)
+let word256FromNumeral w = bs_to_w256 (fromNumeral w)
 
 instance (Numeral word256)
   let fromNumeral = word256FromNumeral

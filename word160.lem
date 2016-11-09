@@ -13,33 +13,47 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 *)
+
 open import Pervasives
 open import Word
 
-type word160 = W160 of bool * list bool
+type word160 = W160 of integer
 declare isabelle target_rep type word160 = `word` 160
 
 (* perhaps should truncate here? *)
 val bs_to_w160 : bitSequence -> word160
-let bs_to_w160 seq = match resizeBitSeq (Just 160) seq with
- | BitSeq _ s b -> W160 s b
-end
+let bs_to_w160 seq = W160 (integerFromBitSeq seq)
 declare isabelle target_rep function bs_to_w160 = (fun w -> `word_of_int` (integerFromBitSeq w))
 
 val w160_to_bs : word160 -> bitSequence
-let w160_to_bs (W160 s b) = BitSeq (Just 160) s b
+let w160_to_bs (W160 i) = bitSeqFromInteger (Just 160) i
 
-val word160BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word160 -> word160 -> 'a
-let word160BinTest binop w1 w2 = binop (w160_to_bs w1) (w160_to_bs w2)
+val base : integer
+let base = 2**160
 
-val word160BinOp : (bitSequence -> bitSequence -> bitSequence) -> word160 -> word160 -> word160
-let word160BinOp binop w1 w2 = bs_to_w160 (binop (w160_to_bs w1) (w160_to_bs w2))
+val word160BinTest : forall 'a. (integer -> integer -> 'a) -> word160 -> word160 -> 'a
+let word160BinTest binop (W160 w1) (W160 w2) = binop (w1 mod base) (w2 mod base)
 
-val word160NatOp : (bitSequence -> nat -> bitSequence) -> word160 -> nat -> word160
-let word160NatOp binop w1 n = bs_to_w160 (binop (w160_to_bs w1) n)
+val word160BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word160 -> word160 -> 'a
+let word160BBinTest binop w1 w2 = binop (w160_to_bs w1) (w160_to_bs w2)
 
-val word160UnaryOp : (bitSequence -> bitSequence) -> word160 -> word160
-let word160UnaryOp op w = bs_to_w160 (op (w160_to_bs w))
+val word160BinOp : (integer -> integer -> integer) -> word160 -> word160 -> word160
+let word160BinOp binop (W160 w1) (W160 w2) = W160 (binop (w1 mod base) (w2 mod base) mod base)
+
+val word160BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word160 -> word160 -> word160
+let word160BBinOp binop w1 w2 = bs_to_w160 (binop (w160_to_bs w1) (w160_to_bs w2))
+
+val word160NatOp : (integer -> nat -> integer) -> word160 -> nat -> word160
+let word160NatOp binop (W160 w1) n = W160  (binop (w1 mod base) n mod base)
+
+val word160BNatOp : (bitSequence -> nat -> bitSequence) -> word160 -> nat -> word160
+let word160BNatOp binop w1 n = bs_to_w160 (binop (w160_to_bs w1) n)
+
+val word160BUnaryOp : (bitSequence -> bitSequence) -> word160 -> word160
+let word160BUnaryOp op w = bs_to_w160 (op (w160_to_bs w))
+
+val word160UnaryOp : (integer -> integer) -> word160 -> word160
+let word160UnaryOp op (W160 w) = W160 (op w mod base)
 
 val word160ToNat : word160 -> nat
 let word160ToNat w = natFromInteger (integerFromBitSeq (w160_to_bs w))
@@ -52,11 +66,11 @@ declare isabelle target_rep function word160ToInt = `sint`
 declare isabelle target_rep function w160_to_bs = (fun w -> bitSeqFromInteger (Just 160) (integerFromInt (word160ToInt w)))
 
 val word160FromInteger : integer -> word160
-let word160FromInteger i = bs_to_w160 (bitSeqFromInteger (Just 160) i)
+let word160FromInteger i = W160 (i mod base)
 declare isabelle target_rep function word160FromInteger = (fun i -> `word_of_int` (intFromInteger i))
 
 val word160FromInt : int -> word160
-let word160FromInt i = bs_to_w160 (bitSeqFromInteger (Just 160) (integerFromInt i))
+let word160FromInt i = W160 (integerFromInt i mod base)
 declare isabelle target_rep function word160FromInt = `word_of_int`
 
 val word160FromNat : nat -> word160
@@ -74,7 +88,7 @@ let boolListFromWord160 w = boolListFrombitSeq 160 (w160_to_bs w)
 declare isabelle target_rep function boolListFromWord160 = `to_bl`
 
 val word160FromNumeral : numeral -> word160
-let word160FromNumeral w = bs_to_w160 (fromNumeral w)
+let word160FromNumeral w = W160 (integerFromNumeral w mod base)
 
 instance (Numeral word160)
   let fromNumeral = word160FromNumeral
@@ -248,6 +262,10 @@ end
 instance (WordAsr word160)
   let (asr) = word160Asr
 end
+
+val word160UGT : word160 -> word160 -> bool
+let word160UGT a b = word160ToNat a > word160ToNat b
+declare isabelle target_rep function word160UGT = infix `>`
 
 declare isabelle target_rep function word160FromNumeral n = ((`word_of_int` n) : word160)
 declare isabelle target_rep function w160Less = `word_sless`
