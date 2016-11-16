@@ -1,0 +1,231 @@
+(*
+  Copyright 2016 Sami Mäkelä
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
+
+open import Pervasives
+open import Evm
+open import Rlp
+
+type f_result =
+| FContinue of variable_env
+| FToWorld of contract_action * storage * (address -> uint) * maybe (variable_env * nat * nat)
+| FError
+
+val step : constant_env -> f_result -> f_result
+let step c st = match st with
+| FContinue v ->
+  match venv_next_instruction v c with
+  | Nothing -> FError
+  | Just i ->
+    match instruction_sem v c i with
+    | InstructionContinue new_v -> FContinue new_v
+    | InstructionToWorld a st bal opt_pushed_v -> FToWorld a st bal opt_pushed_v
+    | _ -> FError
+    end
+  end
+| a -> a
+end
+
+val iter : nat -> constant_env -> f_result -> f_result
+let rec iter n c st = match n with
+ | 0 -> st
+ | n+1 -> iter n c (step c st)
+end
+
+type pred = f_result -> bool
+
+(* Composition *)
+theorem compose_fragment : forall P Q R c1 c2 n1 n2.
+  (forall st. P st --> Q (iter n1 c1 st)) -->
+  (forall st. Q st --> R (iter n2 c2 st)) -->
+  exists c3 n3. (forall st. P st --> R (iter n3 c3 st))
+
+let add_pc n st = match st with
+ | FContinue v -> FContinue <| v with venv_pc = v.venv_pc + n |>
+ | a -> a
+end
+
+let eq_mod_pc n st1 st2 = match (st1, st2) with
+ | (FContinue v1, FContinue v2) -> v1 = <| v2 with venv_pc = v1.venv_pc + n |>
+ | (a,b) -> a = b
+end
+
+let stack_top st w = match st with
+| FContinue <| venv_stack = top :: _ |> -> top = w
+| _ -> false
+end
+
+(* Relocation *)
+theorem relocate : forall c n k st.
+  exists c2. add_pc k (iter n c2 st) = iter n c (add_pc k st)
+
+(* If then else, based on stack *)
+theorem ite_fragment : forall P Q Pre Post cond c1 c2 n1 n2 n_pre.
+  (forall st. P st --> Post (iter n1 c1 st)) -->
+  (forall st. Q st --> Post (iter n2 c2 st)) -->
+  (forall st. Pre st --> stack_top (iter n_pre cond st) 0 --> Q (iter n_pre cond st)) -->
+  (forall st. Pre st --> stack_top (iter n_pre cond st) 1 --> P (iter n_pre cond st)) -->
+  exists c3 n3. (forall st. Pre st --> Post (iter n3 c3 st))
+
+(*******)
+
+theorem loop : forall Pre Post Inv n_pre cond body.
+  (forall st. Pre st --> stack_top (iter n_pre cond st) 0 --> Post (iter n_pre cond st)) -->
+  (forall st. Pre st --> stack_top (iter n_pre cond st) 1 --> Inv (iter n_pre cond st)) -->
+  (forall st. Inv st --> stack_top (iter n_pre cond st) 0 --> Post (iter n_pre cond st)) -->
+  (forall st. Inv st --> stack_top (iter n_pre cond st) 1 --> Inv (iter n_pre cond st)) -->
+  (forall st. exists n_body. n_body > 0 --> Inv st --> Inv (iter n_pre cond st)) -->
+  exists c3 n3. (forall st. Pre st --> Post (iter n3 c3 st))
+
+(* Perhaps the pieces could be combined with big steps instead. then we would have fragments that exit normally *)
+
+let rec big_step c v = match v.venv_gas_left with
+ | 0 -> ProgramStepRunOut
+ | _ ->
+   match venv_next_instruction v c with
+    | Nothing -> ProgramStepRunOut
+    | Just i ->
+      match instruction_sem v c i with
+      | InstructionContinue new_v -> big_step c new_v
+      | InstructionToWorld a st bal opt_pushed_v -> ProgramToWorld a st bal opt_pushed_v
+      | _ -> ProgramInvalid
+      end
+   end
+end
+
+(* *)
+
+let lift pred st = match st with
+ | ProgramToWorld _ _ _ (Just (v,_,_)) -> pred v
+ | _ -> false
+end
+
+let stack_top_big st w = match st with
+| ProgramToWorld _ _ _ (Just (<| venv_stack = top :: _ |>,_,_)) -> top = w
+| _ -> false
+end
+
+theorem compose_big : forall P Q R c1 c2 n1 n2.
+  (forall st. P st --> lift Q (big_step c1 st)) -->
+  (forall st. Q st --> lift R (big_step c2 st)) -->
+  exists c3 n3. (forall st. P st --> lift R (big_step c3 st))
+
+theorem ite_big : forall P Q Pre Post cond c1 c2.
+  (forall st. P st --> lift Post (big_step c1 st)) -->
+  (forall st. Q st --> lift Post (big_step c2 st)) -->
+  (forall st. Pre st --> stack_top_big (big_step cond st) 0 --> lift Q (big_step cond st)) -->
+  (forall st. Pre st --> stack_top_big (big_step cond st) 1 --> lift P (big_step cond st)) -->
+  exists c3. (forall st. Pre st --> lift Post (big_step c3 st))
+
+theorem loop_big : forall Pre Post Inv cond body.
+  (forall st. Pre st --> stack_top_big (big_step cond st) 0 --> lift Post (big_step cond st)) -->
+  (forall st. Pre st --> stack_top_big (big_step cond st) 1 --> lift Inv (big_step cond st)) -->
+  (forall st. Inv st --> stack_top_big (big_step cond st) 0 --> lift Post (big_step cond st)) -->
+  (forall st. Inv st --> stack_top_big (big_step cond st) 1 --> lift Inv (big_step cond st)) -->
+  (forall st. Inv st --> lift Inv (big_step cond st)) -->
+  exists c3. (forall st. Pre st --> lift Post (big_step c3 st))
+
+val replace : forall 'a. ('a -> bool) -> list 'a -> 'a -> list 'a
+let replace pred inst a = if pred a then inst else [a]
+
+(* these fragments cannot have jumps... *)
+val compose_fragments : list inst -> list inst -> list inst
+let compose_fragments a b =
+  List.concat (List.map (replace (fun a -> a = Misc STOP) [Stack (PUSH_N (Rlp.BE (List.length a))); Pc JUMP]) a) ++ [Pc JUMPDEST] ++ b
+
+(* expressions *)
+
+type simple =
+ | ImmedV of uint
+ | StackV of byte
+ | MemoryV of uint
+ | StorageV of uint
+
+let get_simple v expr = match expr with
+ | ImmedV x -> Just x
+ | StackV b -> List.index v.venv_stack (absnat (byte_to_uint b))
+ | MemoryV addr -> Just (read_word_from_bytes 0 (cut_memory addr 32 v.venv_memory))
+ | StorageV addr -> Just (v.venv_storage addr)
+end
+
+let compile_simple expr = match expr with
+ | ImmedV uint -> [Stack (PUSH_N (word_rsplit uint))]
+ | StackV b -> [Dup b]
+ | MemoryV addr -> [Stack (PUSH_N (word_rsplit addr)); Memory MLOAD]
+ | StorageV addr -> [Stack (PUSH_N (word_rsplit addr)); Storage SLOAD]
+end
+
+let get_stack_top st = match st with
+| ProgramToWorld _ _ _ (Just (<| venv_stack = top :: _ |>,_,_)) -> Just top
+| _ -> Nothing
+end
+
+let eval_expr v addr prog =
+  get_stack_top (big_step <| cenv_program = program_of_lst (prog ++ [Misc STOP]); cenv_this = addr |> v)
+
+theorem simple_correct : forall expr v addr. eval_expr v addr (compile_simple expr) = get_simple v expr
+
+type binop = Add | Minus
+
+type unop = Negate | LNot
+
+let calc_unop op x = match op with
+ | Negate -> ~x
+ | LNot -> lnot x
+end
+
+let calc_binop op x y = match op with
+ | Add -> x+y
+ | Minus -> x-y
+end
+
+let lift_option f x = match x with
+ | Just x -> Just (f x)
+ | Nothing -> Nothing
+end
+
+let lift_option2 f x y = match (x,y) with
+ | (Just x, Just y) -> Just (f x y)
+ | _ -> Nothing
+end
+
+type expr =
+ | Simple of simple
+ | Binary of binop * expr * expr
+ | Unary of unop * expr
+
+let rec get_expr v expr = match expr with
+ | Simple s -> get_simple v s
+ | Unary op expr -> lift_option (calc_unop op) (get_expr v expr)
+ | Binary op e1 e2 -> lift_option2 (calc_binop op) (get_expr v e1) (get_expr v e2)
+end
+
+let binop_inst op = match op with
+ | Add -> [Arith ADD]
+ | Minus -> [Arith SUB]
+end
+
+let unop_inst op = match op with
+ | Negate -> compile_simple (ImmedV 0) ++ [Arith SUB]
+ | LNot -> [Bits inst_NOT]
+end
+
+let rec compile_expr expr = match expr with
+ | Simple s -> compile_simple s
+ | Unary op expr -> compile_expr expr ++ unop_inst op
+ | Binary op e1 e2 -> compile_expr e1 ++ compile_expr e2 ++ binop_inst op
+end
+
+

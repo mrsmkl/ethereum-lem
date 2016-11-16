@@ -511,6 +511,7 @@ type variable_env = <|
   venv_memory : memory;
   venv_memory_usage : nat; (* the current memory usage *)
   venv_storage : storage;
+  venv_gas_left : nat;
   venv_pc : nat; (* the program counter *)
   venv_balance : address -> uint; (* balances of all accounts *)
   venv_caller : address; (* the caller's address *)
@@ -1070,7 +1071,7 @@ declare termination_argument program_sem = automatic
 declare termination_argument blocked_program_sem = automatic
 
 val program_sem_blocked : variable_env -> constant_env -> nat -> nat -> bool -> program_result
-let program_sem_blocked v c internal external _ = program_sem v c internal external
+let program_sem_blocked v c internal externa1 _ = program_sem v c internal externa1
 
 type account_state = <|
   account_address : address;
@@ -1166,6 +1167,7 @@ indreln [build_venv_called : account_state -> call_env -> variable_env -> bool]
      venv_origin = origin; (* the origin of the transaction is arbitrarily chosen *)
      venv_ext_program = ext; (* the codes of the external programs are arbitrary. *)
      venv_block = block; (* the block information is chosen arbitrarily. *)
+     venv_gas_left = 0;
    |>
 
 val put_return_values : memory -> list byte -> nat -> nat -> memory
@@ -1180,7 +1182,7 @@ declare termination_argument put_return_values = automatic
 indreln [build_venv_returned : account_state -> return_result -> variable_env -> bool]
 venv_returned:
   forall new_bal a_bal a_code v_pc a_addr a_storage v_stack v_memory v_memory_usage v_storage v_balance v_caller v_value v_data v_init_storage v_init_balance
-         v_origin v_ext_program v_block mem_start mem_size  a_ongoing_rest a_killed r.
+         v_origin v_ext_program v_block v_gas_left mem_start mem_size  a_ongoing_rest a_killed r.
   is_call_like (Map.lookup (v_pc - 1) a_code.program_content) &&
   new_bal >= a_bal ==> (* the balance might have increased from the account state *)
   build_venv_returned
@@ -1202,6 +1204,7 @@ venv_returned:
           venv_balance_at_call = v_init_balance;
           venv_origin = v_origin;
           venv_ext_program = v_ext_program;
+          venv_gas_left = v_gas_left;
           venv_block = v_block;
          |>, mem_start, mem_size) :: a_ongoing_rest;
        account_killed = a_killed
@@ -1222,8 +1225,9 @@ venv_returned:
         venv_origin = v_origin;
         venv_ext_program = v_ext_program;
         venv_block = v_block;
+        venv_gas_left = v_gas_left;
      |>
-
+(*
 val respond_to_call_correctly : (call_env -> contract_behavior) -> account_state -> bool
 let respond_to_call_correctly c a =
   (forall call_env initial_venv resulting_action final_state_pred.
@@ -1274,5 +1278,6 @@ AccountStep: forall precond c r f.
    (forall a. precond a --> respond_to_fail_correctly f a) ==>
    account_state_responds_to_world precond <| when_called = c; when_returned = r; when_failed = f |>
 
+*)
 
 
