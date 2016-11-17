@@ -9,39 +9,81 @@ imports
 
 begin 
 
+(*
+  Copyright 2016 Sami MÃ¤kelÃ¤
+
+   Licensed under the Apache License, Version 2.0 (the License);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an AS IS BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
 
 (*open import Pervasives*)
 (*open import Word*)
 
-(*type word160 = W160 of bool * list bool*)
+(*type word160 = W160 of integer*)
 
 (* perhaps should truncate here? *)
 (*val bs_to_w160 : bitSequence -> word160*)
-(*let bs_to_w160 seq=  match resizeBitSeq (Just 160) seq with
- | BitSeq _ s b -> W160 s b
-end*)
+(*let bs_to_w160 seq=  W160 (integerFromBitSeq seq)*)
 
 (*val w160_to_bs : word160 -> bitSequence*)
-(*let w160_to_bs (W160 s b)=  BitSeq (Just 160) s b*)
+(*let w160_to_bs (W160 i)=  bitSeqFromInteger (Just 160) i*)
 
-(*val word160BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word160 -> word160 -> 'a*)
-definition word160BinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 'a "  where 
-     " word160BinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w2))"
-
-
-(*val word160BinOp : (bitSequence -> bitSequence -> bitSequence) -> word160 -> word160 -> word160*)
-definition word160BinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
-     " word160BinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w2)))"
+(*val base : integer*)
+definition base  :: " int "  where 
+     " base = (( 2 :: int)^( 160 :: nat))"
 
 
-(*val word160NatOp : (bitSequence -> nat -> bitSequence) -> word160 -> nat -> word160*)
-definition word160NatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> nat \<Rightarrow> 160 word "  where 
-     " word160NatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) n))"
+(*val word160BinTest : forall 'a. (integer -> integer -> 'a) -> word160 -> word160 -> 'a*)
+fun word160BinTest  :: "(int \<Rightarrow> int \<Rightarrow> 'a)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 'a "  where 
+     " word160BinTest binop (W160 w1) (W160 w2) = ( binop (w1 mod base) (w2 mod base))" 
+declare word160BinTest.simps [simp del]
 
 
-(*val word160UnaryOp : (bitSequence -> bitSequence) -> word160 -> word160*)
-definition word160UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
-     " word160UnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w)))"
+(*val word160BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word160 -> word160 -> 'a*)
+definition word160BBinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 'a "  where 
+     " word160BBinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w2))"
+
+
+(*val word160BinOp : (integer -> integer -> integer) -> word160 -> word160 -> word160*)
+fun word160BinOp  :: "(int \<Rightarrow> int \<Rightarrow> int)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
+     " word160BinOp binop (W160 w1) (W160 w2) = ( W160 (binop (w1 mod base) (w2 mod base) mod base))" 
+declare word160BinOp.simps [simp del]
+
+
+(*val word160BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word160 -> word160 -> word160*)
+definition word160BBinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
+     " word160BBinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w2)))"
+
+
+(*val word160NatOp : (integer -> nat -> integer) -> word160 -> nat -> word160*)
+fun word160NatOp  :: "(int \<Rightarrow> nat \<Rightarrow> int)\<Rightarrow> 160 word \<Rightarrow> nat \<Rightarrow> 160 word "  where 
+     " word160NatOp binop (W160 w1) n = ( W160  (binop (w1 mod base) n mod base))" 
+declare word160NatOp.simps [simp del]
+
+
+(*val word160BNatOp : (bitSequence -> nat -> bitSequence) -> word160 -> nat -> word160*)
+definition word160BNatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> nat \<Rightarrow> 160 word "  where 
+     " word160BNatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w1) n))"
+
+
+(*val word160BUnaryOp : (bitSequence -> bitSequence) -> word160 -> word160*)
+definition word160BUnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
+     " word160BUnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w)))"
+
+
+(*val word160UnaryOp : (integer -> integer) -> word160 -> word160*)
+fun word160UnaryOp  :: "(int \<Rightarrow> int)\<Rightarrow> 160 word \<Rightarrow> 160 word "  where 
+     " word160UnaryOp op1 (W160 w) = ( W160 (op1 w mod base))" 
+declare word160UnaryOp.simps [simp del]
 
 
 (*val word160ToNat : word160 -> nat*)
@@ -51,10 +93,10 @@ definition word160UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarr
 (*let word160ToInt w=  intFromInteger (integerFromBitSeq (w160_to_bs w))*)
 
 (*val word160FromInteger : integer -> word160*)
-(*let word160FromInteger i=  bs_to_w160 (bitSeqFromInteger (Just 160) i)*)
+(*let word160FromInteger i=  W160 ((Instance_Num_NumRemainder_Num_integer.mod) i base)*)
 
 (*val word160FromInt : int -> word160*)
-(*let word160FromInt i=  bs_to_w160 (bitSeqFromInteger (Just 160) (integerFromInt i))*)
+(*let word160FromInt i=  W160 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromInt i) base)*)
 
 (*val word160FromNat : nat -> word160*)
 definition word160FromNat  :: " nat \<Rightarrow> 160 word "  where 
@@ -71,7 +113,7 @@ end*)
 (*let boolListFromWord160 w=  boolListFrombitSeq 160 (w160_to_bs w)*)
 
 (*val word160FromNumeral : numeral -> word160*)
-(*let word160FromNumeral w=  bs_to_w160 (Instance_Num_Numeral_Word_bitSequence.fromNumeral w)*)
+(*let word160FromNumeral w=  W160 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromNumeral w) base)*)
 
 (*val w160Eq : word160 -> word160 -> bool*)
 definition w160Eq  :: " 160 word \<Rightarrow> 160 word \<Rightarrow> bool "  where 
@@ -80,23 +122,23 @@ definition w160Eq  :: " 160 word \<Rightarrow> 160 word \<Rightarrow> bool "  wh
 
 (*val w160Less : word160 -> word160 -> bool*)
 (*let w160Less bs1 bs2=  word160BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<) bs1 bs2*)
 
 (*val w160LessEqual : word160 -> word160 -> bool*)
 (*let w160LessEqual bs1 bs2=  word160BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<=) bs1 bs2*)
 
 (*val w160Greater : word160 -> word160 -> bool*)
 (*let w160Greater bs1 bs2=  word160BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>) bs1 bs2*)
 
 (*val w160GreaterEqual : word160 -> word160 -> bool*)
 (*let w160GreaterEqual bs1 bs2=  word160BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>=) bs1 bs2*)
 
 (*val w160Compare : word160 -> word160 -> ordering*)
 (*let w160Compare bs1 bs2=  word160BinTest  
-  Instance_Basic_classes_Ord_Word_bitSequence.compare bs1 bs2*)
+  Instance_Basic_classes_Ord_Num_integer.compare bs1 bs2*)
 
 definition instance_Basic_classes_Ord_Word160_word160_dict  :: "( 160 word)Ord_class "  where 
      " instance_Basic_classes_Ord_Word160_word160_dict = ((|
@@ -114,77 +156,77 @@ definition instance_Basic_classes_Ord_Word160_word160_dict  :: "( 160 word)Ord_c
 
 (*val word160Negate : word160 -> word160*)
 (*let word160Negate=  word160UnaryOp  
-  Instance_Num_NumNegate_Word_bitSequence.~*)
+  Instance_Num_NumNegate_Num_integer.~*)
 
 (*val word160Succ : word160 -> word160*)
 (*let word160Succ=  word160UnaryOp  
-  Instance_Num_NumSucc_Word_bitSequence.succ*)
+  Instance_Num_NumSucc_Num_integer.succ*)
 
 (*val word160Pred : word160 -> word160*)
 (*let word160Pred=  word160UnaryOp  
-  Instance_Num_NumPred_Word_bitSequence.pred*)
+  Instance_Num_NumPred_Num_integer.pred*)
 
 (*val word160Lnot : word160 -> word160*)
 (*let word160Lnot=  word160UnaryOp  
-  Instance_Word_WordNot_Word_bitSequence.lnot*)
+  Instance_Word_WordNot_Num_integer.lnot*)
 
 (*val word160Add : word160 -> word160 -> word160*)
 (*let word160Add=  word160BinOp  
-  (Instance_Num_NumAdd_Word_bitSequence.+)*)
+  (Instance_Num_NumAdd_Num_integer.+)*)
 
 (*val word160Minus : word160 -> word160 -> word160*)
 (*let word160Minus=  word160BinOp  
-  (Instance_Num_NumMinus_Word_bitSequence.-)*)
+  (Instance_Num_NumMinus_Num_integer.-)*)
 
 (*val word160Mult : word160 -> word160 -> word160*)
 (*let word160Mult=  word160BinOp  
-  ( Instance_Num_NumMult_Word_bitSequence.* )*)
+  ( Instance_Num_NumMult_Num_integer.* )*)
 
 (*val word160IntegerDivision : word160 -> word160 -> word160*)
 (*let word160IntegerDivision=  word160BinOp  
-  (Instance_Num_NumDivision_Word_bitSequence./)*)
+  (Instance_Num_NumDivision_Num_integer./)*)
 
 (*val word160Division : word160 -> word160 -> word160*)
 (*let word160Division=  word160BinOp  
-  Instance_Num_NumIntegerDivision_Word_bitSequence.div*)
+  Instance_Num_NumIntegerDivision_Num_integer.div*)
 
 (*val word160Remainder : word160 -> word160 -> word160*)
 (*let word160Remainder=  word160BinOp  
-  (Instance_Num_NumRemainder_Word_bitSequence.mod)*)
+  (Instance_Num_NumRemainder_Num_integer.mod)*)
 
 (*val word160Land : word160 -> word160 -> word160*)
 (*let word160Land=  word160BinOp  
-  (Instance_Word_WordAnd_Word_bitSequence.land)*)
+  (Instance_Word_WordAnd_Num_integer.land)*)
 
 (*val word160Lor : word160 -> word160 -> word160*)
 (*let word160Lor=  word160BinOp  
-  (Instance_Word_WordOr_Word_bitSequence.lor)*)
+  (Instance_Word_WordOr_Num_integer.lor)*)
 
 (*val word160Lxor : word160 -> word160 -> word160*)
 (*let word160Lxor=  word160BinOp  
-  (Instance_Word_WordXor_Word_bitSequence.lxor)*)
+  (Instance_Word_WordXor_Num_integer.lxor)*)
 
 (*val word160Min : word160 -> word160 -> word160*)
-(*let word160Min=  word160BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.min)*)
+(*let word160Min=  word160BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.min)*)
 
 (*val word160Max : word160 -> word160 -> word160*)
-(*let word160Max=  word160BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.max)*)
+(*let word160Max=  word160BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.max)*)
 
 (*val word160Power : word160 -> nat -> word160*)
 (*let word160Power=  word160NatOp  
-  ( Instance_Num_NumPow_Word_bitSequence.** )*)
+  ( Instance_Num_NumPow_Num_integer.** )*)
 
 (*val word160Asr : word160 -> nat -> word160*)
 (*let word160Asr=  word160NatOp  
-  (Instance_Word_WordAsr_Word_bitSequence.asr)*)
+  (Instance_Word_WordAsr_Num_integer.asr)*)
 
 (*val word160Lsr : word160 -> nat -> word160*)
 (*let word160Lsr=  word160NatOp  
-  (Instance_Word_WordLsr_Word_bitSequence.lsr)*)
+  (Instance_Word_WordLsr_Num_integer.lsr)*)
 
 (*val word160Lsl : word160 -> nat -> word160*)
 (*let word160Lsl=  word160NatOp  
-  (Instance_Word_WordLsl_Word_bitSequence.lsl)*)
+  (Instance_Word_WordLsl_Num_integer.lsl)*)
 
 
 definition instance_Num_NumNegate_Word160_word160_dict  :: "( 160 word)NumNegate_class "  where 
@@ -296,5 +338,8 @@ definition instance_Word_WordAsr_Word160_word160_dict  :: "( 160 word)WordAsr_cl
 
   asr_method = (op>>>)|) )"
 
+
+(*val word160UGT : word160 -> word160 -> bool*)
+(*let word160UGT a b=  (Instance_Basic_classes_Ord_nat.>) (word160ToNat a) (word160ToNat b)*)
 
 end

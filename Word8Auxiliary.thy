@@ -19,14 +19,14 @@ begin
 
 lemma bs_to_w8_def_lemma:
 " ((\<forall> seq.
-   (case  resizeBitSeq (Some (( 8 :: nat))) seq of   BitSeq _ s b => W8 s b )
-     = (\<lambda> w .  word_of_int (integerFromBitSeq w)) seq)) "
+   W8 (integerFromBitSeq seq) =
+     (\<lambda> w .  word_of_int (integerFromBitSeq w)) seq)) "
 (* Theorem: bs_to_w8_def_lemma*)(* try *) by auto
 
 lemma w8_to_bs_def_lemma:
-" ((\<forall> s. \<forall> b.
-   BitSeq (Some (( 8 :: nat))) s b =
-     (\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) (W8 s b))) "
+" ((\<forall> i.
+   bitSeqFromInteger (Some (( 8 :: nat))) i =
+     (\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) (W8 i))) "
 (* Theorem: w8_to_bs_def_lemma*)(* try *) by auto
 
 lemma word8ToNat_def_lemma:
@@ -48,16 +48,11 @@ lemma word8ToInt_def_lemma:
 (* Theorem: word8ToInt_def_lemma*)(* try *) by auto
 
 lemma word8FromInteger_def_lemma:
-" ((\<forall> i.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger (Some (( 8 :: nat))) i) =
-     (\<lambda> i .  word_of_int ( i)) i)) "
+" ((\<forall> i. W8 (i mod base) = (\<lambda> i .  word_of_int ( i)) i)) "
 (* Theorem: word8FromInteger_def_lemma*)(* try *) by auto
 
 lemma word8FromInt_def_lemma:
-" ((\<forall> i.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger (Some (( 8 :: nat))) ( i)) = word_of_int i)) "
+" ((\<forall> i. W8 ( i mod base) = word_of_int i)) "
 (* Theorem: word8FromInt_def_lemma*)(* try *) by auto
 
 lemma word8FromBoollist_def_lemma:
@@ -76,112 +71,114 @@ lemma boolListFromWord8_def_lemma:
 (* Theorem: boolListFromWord8_def_lemma*)(* try *) by auto
 
 lemma word8FromNumeral_def_lemma:
-" ((\<forall> w.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger None (( w :: int))) = ((word_of_int w) :: 8 word))) "
+" ((\<forall> w. W8 (( w :: int) mod base) = ((word_of_int w) :: 8 word))) "
 (* Theorem: word8FromNumeral_def_lemma*)(* try *) by auto
 
 lemma w8Less_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word8BinTest bitSeqLess bs1 bs2 = word_sless bs1 bs2)) "
+   word8BinTest (op<) bs1 bs2 = word_sless bs1 bs2)) "
 (* Theorem: w8Less_def_lemma*)(* try *) by auto
 
 lemma w8LessEqual_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word8BinTest bitSeqLessEqual bs1 bs2 = word_sle bs1 bs2)) "
+   word8BinTest (op \<le>) bs1 bs2 = word_sle bs1 bs2)) "
 (* Theorem: w8LessEqual_def_lemma*)(* try *) by auto
 
 lemma w8Greater_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word8BinTest bitSeqGreater bs1 bs2 = word_sless bs2 bs1)) "
+   word8BinTest (op>) bs1 bs2 = word_sless bs2 bs1)) "
 (* Theorem: w8Greater_def_lemma*)(* try *) by auto
 
 lemma w8GreaterEqual_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word8BinTest bitSeqGreaterEqual bs1 bs2 = word_sle bs2 bs1)) "
+   word8BinTest (op \<ge>) bs1 bs2 = word_sle bs2 bs1)) "
 (* Theorem: w8GreaterEqual_def_lemma*)(* try *) by auto
 
 lemma w8Compare_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word8BinTest bitSeqCompare bs1 bs2 =
+   word8BinTest (genericCompare (op<) (op=)) bs1 bs2 =
      (genericCompare word_sless w8Eq bs1 bs2))) "
 (* Theorem: w8Compare_def_lemma*)(* try *) by auto
 
 lemma word8Negate_def_lemma:
-" (( word8UnaryOp bitSeqNegate = (\<lambda> i. - i))) "
+" (( word8UnaryOp (\<lambda> i. - i) = (\<lambda> i. - i))) "
 (* Theorem: word8Negate_def_lemma*)(* try *) by auto
 
 lemma word8Succ_def_lemma:
-" (( word8UnaryOp bitSeqSucc = (\<lambda> n. n + 1))) "
+" (( word8UnaryOp (\<lambda> n. n + ( 1 :: int)) = (\<lambda> n. n + 1))) "
 (* Theorem: word8Succ_def_lemma*)(* try *) by auto
 
 lemma word8Pred_def_lemma:
-" (( word8UnaryOp bitSeqPred = (\<lambda> n. n - 1))) "
+" (( word8UnaryOp (\<lambda> n. n - ( 1 :: int)) = (\<lambda> n. n - 1))) "
 (* Theorem: word8Pred_def_lemma*)(* try *) by auto
 
 lemma word8Lnot_def_lemma:
-" (( word8UnaryOp bitSeqNot = (\<lambda> w. (NOT w)))) "
+" (( word8UnaryOp integerLnot = (\<lambda> w. (NOT w)))) "
 (* Theorem: word8Lnot_def_lemma*)(* try *) by auto
 
 lemma word8Add_def_lemma:
-" (( word8BinOp bitSeqAdd = (op+))) "
+" (( word8BinOp (op+) = (op+))) "
 (* Theorem: word8Add_def_lemma*)(* try *) by auto
 
 lemma word8Minus_def_lemma:
-" (( word8BinOp bitSeqMinus = (op-))) "
+" (( word8BinOp (op-) = (op-))) "
 (* Theorem: word8Minus_def_lemma*)(* try *) by auto
 
 lemma word8Mult_def_lemma:
-" (( word8BinOp bitSeqMult = (op*))) "
+" (( word8BinOp (op*) = (op*))) "
 (* Theorem: word8Mult_def_lemma*)(* try *) by auto
 
 lemma word8IntegerDivision_def_lemma:
-" (( word8BinOp bitSeqDiv = (op div))) "
+" (( word8BinOp (op div) = (op div))) "
 (* Theorem: word8IntegerDivision_def_lemma*)(* try *) by auto
 
 lemma word8Division_def_lemma:
-" (( word8BinOp bitSeqDiv = (op div))) "
+" (( word8BinOp (op div) = (op div))) "
 (* Theorem: word8Division_def_lemma*)(* try *) by auto
 
 lemma word8Remainder_def_lemma:
-" (( word8BinOp bitSeqMod = (op mod))) "
+" (( word8BinOp (op mod) = (op mod))) "
 (* Theorem: word8Remainder_def_lemma*)(* try *) by auto
 
 lemma word8Land_def_lemma:
-" (( word8BinOp bitSeqAnd = (op AND))) "
+" (( word8BinOp integerLand = (op AND))) "
 (* Theorem: word8Land_def_lemma*)(* try *) by auto
 
 lemma word8Lor_def_lemma:
-" (( word8BinOp bitSeqOr = (op OR))) "
+" (( word8BinOp integerLor = (op OR))) "
 (* Theorem: word8Lor_def_lemma*)(* try *) by auto
 
 lemma word8Lxor_def_lemma:
-" (( word8BinOp bitSeqXor = (op XOR))) "
+" (( word8BinOp integerLxor = (op XOR))) "
 (* Theorem: word8Lxor_def_lemma*)(* try *) by auto
 
 lemma word8Min_def_lemma:
-" (( word8BinOp (bitSeqMin) = min)) "
+" (( word8BinOp (min) = min)) "
 (* Theorem: word8Min_def_lemma*)(* try *) by auto
 
 lemma word8Max_def_lemma:
-" (( word8BinOp (bitSeqMax) = max)) "
+" (( word8BinOp (max) = max)) "
 (* Theorem: word8Max_def_lemma*)(* try *) by auto
 
 lemma word8Power_def_lemma:
-" (( word8NatOp bitSeqPow = (op^))) "
+" (( word8NatOp (op^) = (op^))) "
 (* Theorem: word8Power_def_lemma*)(* try *) by auto
 
 lemma word8Asr_def_lemma:
-" (( word8NatOp bitSeqArithmeticShiftRight = (op>>>))) "
+" (( word8NatOp integerAsr = (op>>>))) "
 (* Theorem: word8Asr_def_lemma*)(* try *) by auto
 
 lemma word8Lsr_def_lemma:
-" (( word8NatOp bitSeqLogicalShiftRight = (op>>))) "
+" (( word8NatOp integerAsr = (op>>))) "
 (* Theorem: word8Lsr_def_lemma*)(* try *) by auto
 
 lemma word8Lsl_def_lemma:
-" (( word8NatOp bitSeqShiftLeft = (op<<))) "
+" (( word8NatOp integerLsl = (op<<))) "
 (* Theorem: word8Lsl_def_lemma*)(* try *) by auto
+
+lemma word8UGT_def_lemma:
+" ((\<forall> a. \<forall> b. (unat a > unat b) = a > b)) "
+(* Theorem: word8UGT_def_lemma*)(* try *) by auto
 
 
 

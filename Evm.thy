@@ -12,7 +12,21 @@ imports
 
 begin 
 
+(*
+  Copyright 2016 Sami MÃ¤kelÃ¤
 
+   Licensed under the Apache License, Version 2.0 (the License);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an AS IS BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
 (*open import Pervasives*)
 (*open import Word*)
 (*open import Word256*)
@@ -91,6 +105,18 @@ declare word_rsplit_aux.simps [simp del]
 
 (*val word_rsplit : uint -> list byte*)
 (*let word_rsplit w=  word_rsplit_aux (boolListFromWord256 w) 32*)
+
+(*val address_to_bytes : address -> list byte*)
+(*let address_to_bytes w=  word_rsplit_aux (boolListFromWord160 w) 20*)
+
+(*val word_of_bytes : list byte -> uint*)
+(*let word_of_bytes lst=  word256FromBoollist (List.concat (map boolListFromWord8 lst))*)
+
+(*val address_of_bytes : list byte -> address*)
+definition address_of_bytes  :: "( 8 word)list \<Rightarrow> 160 word "  where 
+     " address_of_bytes lst = ( of_bl (List.concat (List.map to_bl lst)))"
+
+
 
 (*val get_byte : uint -> uint -> uint*)
 definition get_byte  :: " 256 word \<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
@@ -597,6 +623,8 @@ record variable_env =
  (* the current memory usage *)
   venv_storage ::" storage " 
 
+  venv_gas_left ::" nat " 
+
   venv_pc ::" nat " 
  (* the program counter *)
   venv_balance ::" address \<Rightarrow> uint " 
@@ -826,14 +854,9 @@ definition datasize  :: " variable_env \<Rightarrow> 256 word "  where
      " datasize v = ( word256FromNat (List.length(venv_data_sent   v)))"
 
 
-(*val word_of_bytes : list byte -> uint*)
-definition word_of_bytes  :: "( 8 word)list \<Rightarrow> 256 word "  where 
-     " word_of_bytes lst = ( of_bl (List.concat (List.map to_bl lst)))"
-
-
 (*val read_word_from_bytes : nat -> list byte -> uint*)
 definition read_word_from_bytes  :: " nat \<Rightarrow>( 8 word)list \<Rightarrow> 256 word "  where 
-     " read_word_from_bytes idx lst = ( word_of_bytes (List.take(( 32 :: nat)) (List.drop idx lst)))"
+     " read_word_from_bytes idx lst = ( word_rcat (List.take(( 32 :: nat)) (List.drop idx lst)))"
 
 
 (*val cut_data : variable_env -> uint -> uint*)
@@ -962,7 +985,7 @@ definition ret  :: " variable_env \<Rightarrow> constant_env \<Rightarrow> instr
 
 (*val stop : variable_env -> constant_env -> instruction_result*)
 definition stop  :: " variable_env \<Rightarrow> constant_env \<Rightarrow> instruction_result "  where 
-     " stop v _ = ( InstructionToWorld (ContractReturn [])(venv_storage   v)(venv_balance   v) None )"
+     " stop v _ = ( InstructionToWorld (ContractReturn [])(venv_storage   v)(venv_balance   v) (Some (v,( 0 :: nat),( 0 :: nat))))"
 
 
 (*val pop : variable_env -> constant_env -> instruction_result*)
@@ -1137,7 +1160,7 @@ definition suicide  :: " variable_env \<Rightarrow> constant_env \<Rightarrow> i
 
 (*val instruction_sem : variable_env -> constant_env -> inst -> instruction_result*)
 fun instruction_sem  :: " variable_env \<Rightarrow> constant_env \<Rightarrow> inst \<Rightarrow> instruction_result "  where 
-     " instruction_sem v c (Stack (PUSH_N lst)) = ( stack_0_1_op v c (word_of_bytes lst))"
+     " instruction_sem v c (Stack (PUSH_N lst)) = ( stack_0_1_op v c (word_rcat lst))"
 |" instruction_sem v c (Unknown _) = ( instruction_failure_result v )"
 |" instruction_sem v c (Storage SLOAD) = ( stack_1_1_op v c(venv_storage   v))"
 |" instruction_sem v c (Storage SSTORE) = ( sstore v c )"
@@ -1274,7 +1297,7 @@ declare program_sem.simps [simp del]
 
 (*val program_sem_blocked : variable_env -> constant_env -> nat -> nat -> bool -> program_result*)
 definition program_sem_blocked  :: " variable_env \<Rightarrow> constant_env \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool \<Rightarrow> program_result "  where 
-     " program_sem_blocked v c internal external _ = ( program_sem v c internal external )"
+     " program_sem_blocked v c internal externa1 _ = ( program_sem v c internal externa1 )"
 
 
 record account_state = 
@@ -1386,7 +1409,8 @@ inductive
  (| venv_stack = ([]), (* The stack is initialized for every invocation *)
     venv_memory = empty_memory, (* The memory is also initialized for every invocation *)
      venv_memory_usage =(( 0 :: nat)), (* The memory usage is initialized. *)
-     venv_storage = ((account_storage   a)), (* The storage is taken from the account state *)
+     venv_storage = ((account_storage   a)), (* the block information is chosen arbitrarily. *)
+     venv_gas_left =(( 0 :: nat)), (* The storage is taken from the account state *)
      venv_pc =(( 0 :: nat)), (* The program counter is initialized to zero *)
      venv_balance = (\<lambda> (addr::address) .  if addr =(account_address   a) then bal(account_address   a) +(callenv_value   env) else bal addr), 
                         (* The balance is arbitrary, except that the balance of this account
@@ -1398,7 +1422,7 @@ inductive
      venv_balance_at_call = bal, (* the snapshot of the balance is remembered in case of failure *)
      venv_origin = origin, (* the origin of the transaction is arbitrarily chosen *)
      venv_ext_program = ext, (* the codes of the external programs are arbitrary. *)
-     venv_block = block  (* the block information is chosen arbitrarily. *)
+     venv_block = block 
    |) "
 
 (*val put_return_values : memory -> list byte -> nat -> nat -> memory*)
@@ -1416,7 +1440,7 @@ inductive (* the balance might have increased from the account state *)
   build_venv_returned  :: " account_state \<Rightarrow> return_result \<Rightarrow> variable_env \<Rightarrow> bool "  where
 "venv_returned":
   " \<And> new_bal a_bal a_code v_pc a_addr a_storage v_stack v_memory v_memory_usage v_storage v_balance v_caller v_value v_data v_init_storage v_init_balance
-         v_origin v_ext_program v_block mem_start mem_size  a_ongoing_rest a_killed r.
+         v_origin v_ext_program v_block v_gas_left mem_start mem_size  a_ongoing_rest a_killed r.
   is_call_like ((program_content   a_code) (v_pc -( 1 :: nat))) \<and> word_sle a_bal new_bal ==> (* the balance might have increased from the account state *)
   build_venv_returned
      (| account_address = a_addr,
@@ -1428,6 +1452,7 @@ inductive (* the balance might have increased from the account state *)
           venv_memory = v_memory,
           venv_memory_usage = v_memory_usage,
           venv_storage = v_storage,
+          venv_gas_left = v_gas_left,
           venv_pc = v_pc,
           venv_balance = v_balance,
           venv_caller = v_caller,
@@ -1446,6 +1471,7 @@ inductive (* the balance might have increased from the account state *)
         venv_memory = (put_return_values v_memory(return_data   r) mem_start mem_size),
         venv_memory_usage = v_memory_usage,
         venv_storage = a_storage,
+        venv_gas_left = v_gas_left,
         venv_pc = v_pc,
         venv_balance = (update_balance a_addr
                             (\<lambda> _ .  new_bal)(return_balance   r)),
@@ -1515,7 +1541,6 @@ inductive
 (((\<forall> a.  precond a \<longrightarrow> respond_to_return_correctly r a)) \<and>
    ((\<forall> a.  precond a \<longrightarrow> respond_to_fail_correctly f a))) ==>
    account_state_responds_to_world precond (| when_called = c, when_returned = r, when_failed = f |) "
-
 
 
 end

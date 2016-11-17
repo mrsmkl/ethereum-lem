@@ -9,39 +9,81 @@ imports
 
 begin 
 
+(*
+  Copyright 2016 Sami MÃ¤kelÃ¤
+
+   Licensed under the Apache License, Version 2.0 (the License);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an AS IS BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
 
 (*open import Pervasives*)
 (*open import Word*)
 
-(*type word8 = W8 of bool * list bool*)
+(*type word8 = W8 of integer*)
 
 (* perhaps should truncate here? *)
 (*val bs_to_w8 : bitSequence -> word8*)
-(*let bs_to_w8 seq=  match resizeBitSeq (Just 8) seq with
- | BitSeq _ s b -> W8 s b
-end*)
+(*let bs_to_w8 seq=  W8 (integerFromBitSeq seq)*)
 
 (*val w8_to_bs : word8 -> bitSequence*)
-(*let w8_to_bs (W8 s b)=  BitSeq (Just 8) s b*)
+(*let w8_to_bs (W8 i)=  bitSeqFromInteger (Just 8) i*)
 
-(*val word8BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word8 -> word8 -> 'a*)
-definition word8BinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 'a "  where 
-     " word8BinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w2))"
-
-
-(*val word8BinOp : (bitSequence -> bitSequence -> bitSequence) -> word8 -> word8 -> word8*)
-definition word8BinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
-     " word8BinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w2)))"
+(*val base : integer*)
+definition base  :: " int "  where 
+     " base = (( 2 :: int)^( 8 :: nat))"
 
 
-(*val word8NatOp : (bitSequence -> nat -> bitSequence) -> word8 -> nat -> word8*)
-definition word8NatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> nat \<Rightarrow> 8 word "  where 
-     " word8NatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) n))"
+(*val word8BinTest : forall 'a. (integer -> integer -> 'a) -> word8 -> word8 -> 'a*)
+fun word8BinTest  :: "(int \<Rightarrow> int \<Rightarrow> 'a)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 'a "  where 
+     " word8BinTest binop (W8 w1) (W8 w2) = ( binop (w1 mod base) (w2 mod base))" 
+declare word8BinTest.simps [simp del]
 
 
-(*val word8UnaryOp : (bitSequence -> bitSequence) -> word8 -> word8*)
-definition word8UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
-     " word8UnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w)))"
+(*val word8BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word8 -> word8 -> 'a*)
+definition word8BBinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 'a "  where 
+     " word8BBinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w2))"
+
+
+(*val word8BinOp : (integer -> integer -> integer) -> word8 -> word8 -> word8*)
+fun word8BinOp  :: "(int \<Rightarrow> int \<Rightarrow> int)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
+     " word8BinOp binop (W8 w1) (W8 w2) = ( W8 (binop (w1 mod base) (w2 mod base) mod base))" 
+declare word8BinOp.simps [simp del]
+
+
+(*val word8BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word8 -> word8 -> word8*)
+definition word8BBinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
+     " word8BBinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w2)))"
+
+
+(*val word8NatOp : (integer -> nat -> integer) -> word8 -> nat -> word8*)
+fun word8NatOp  :: "(int \<Rightarrow> nat \<Rightarrow> int)\<Rightarrow> 8 word \<Rightarrow> nat \<Rightarrow> 8 word "  where 
+     " word8NatOp binop (W8 w1) n = ( W8  (binop (w1 mod base) n mod base))" 
+declare word8NatOp.simps [simp del]
+
+
+(*val word8BNatOp : (bitSequence -> nat -> bitSequence) -> word8 -> nat -> word8*)
+definition word8BNatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> nat \<Rightarrow> 8 word "  where 
+     " word8BNatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w1) n))"
+
+
+(*val word8BUnaryOp : (bitSequence -> bitSequence) -> word8 -> word8*)
+definition word8BUnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
+     " word8BUnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 8) ( (sint w))) w)))"
+
+
+(*val word8UnaryOp : (integer -> integer) -> word8 -> word8*)
+fun word8UnaryOp  :: "(int \<Rightarrow> int)\<Rightarrow> 8 word \<Rightarrow> 8 word "  where 
+     " word8UnaryOp op1 (W8 w) = ( W8 (op1 w mod base))" 
+declare word8UnaryOp.simps [simp del]
 
 
 (*val word8ToNat : word8 -> nat*)
@@ -51,10 +93,10 @@ definition word8UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow
 (*let word8ToInt w=  intFromInteger (integerFromBitSeq (w8_to_bs w))*)
 
 (*val word8FromInteger : integer -> word8*)
-(*let word8FromInteger i=  bs_to_w8 (bitSeqFromInteger (Just 8) i)*)
+(*let word8FromInteger i=  W8 ((Instance_Num_NumRemainder_Num_integer.mod) i base)*)
 
 (*val word8FromInt : int -> word8*)
-(*let word8FromInt i=  bs_to_w8 (bitSeqFromInteger (Just 8) (integerFromInt i))*)
+(*let word8FromInt i=  W8 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromInt i) base)*)
 
 (*val word8FromNat : nat -> word8*)
 definition word8FromNat  :: " nat \<Rightarrow> 8 word "  where 
@@ -71,7 +113,7 @@ end*)
 (*let boolListFromWord8 w=  boolListFrombitSeq 8 (w8_to_bs w)*)
 
 (*val word8FromNumeral : numeral -> word8*)
-(*let word8FromNumeral w=  bs_to_w8 (Instance_Num_Numeral_Word_bitSequence.fromNumeral w)*)
+(*let word8FromNumeral w=  W8 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromNumeral w) base)*)
 
 (*val w8Eq : word8 -> word8 -> bool*)
 definition w8Eq  :: " 8 word \<Rightarrow> 8 word \<Rightarrow> bool "  where 
@@ -80,23 +122,23 @@ definition w8Eq  :: " 8 word \<Rightarrow> 8 word \<Rightarrow> bool "  where
 
 (*val w8Less : word8 -> word8 -> bool*)
 (*let w8Less bs1 bs2=  word8BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<) bs1 bs2*)
 
 (*val w8LessEqual : word8 -> word8 -> bool*)
 (*let w8LessEqual bs1 bs2=  word8BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<=) bs1 bs2*)
 
 (*val w8Greater : word8 -> word8 -> bool*)
 (*let w8Greater bs1 bs2=  word8BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>) bs1 bs2*)
 
 (*val w8GreaterEqual : word8 -> word8 -> bool*)
 (*let w8GreaterEqual bs1 bs2=  word8BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>=) bs1 bs2*)
 
 (*val w8Compare : word8 -> word8 -> ordering*)
 (*let w8Compare bs1 bs2=  word8BinTest  
-  Instance_Basic_classes_Ord_Word_bitSequence.compare bs1 bs2*)
+  Instance_Basic_classes_Ord_Num_integer.compare bs1 bs2*)
 
 definition instance_Basic_classes_Ord_Word8_word8_dict  :: "( 8 word)Ord_class "  where 
      " instance_Basic_classes_Ord_Word8_word8_dict = ((|
@@ -114,77 +156,77 @@ definition instance_Basic_classes_Ord_Word8_word8_dict  :: "( 8 word)Ord_class "
 
 (*val word8Negate : word8 -> word8*)
 (*let word8Negate=  word8UnaryOp  
-  Instance_Num_NumNegate_Word_bitSequence.~*)
+  Instance_Num_NumNegate_Num_integer.~*)
 
 (*val word8Succ : word8 -> word8*)
 (*let word8Succ=  word8UnaryOp  
-  Instance_Num_NumSucc_Word_bitSequence.succ*)
+  Instance_Num_NumSucc_Num_integer.succ*)
 
 (*val word8Pred : word8 -> word8*)
 (*let word8Pred=  word8UnaryOp  
-  Instance_Num_NumPred_Word_bitSequence.pred*)
+  Instance_Num_NumPred_Num_integer.pred*)
 
 (*val word8Lnot : word8 -> word8*)
 (*let word8Lnot=  word8UnaryOp  
-  Instance_Word_WordNot_Word_bitSequence.lnot*)
+  Instance_Word_WordNot_Num_integer.lnot*)
 
 (*val word8Add : word8 -> word8 -> word8*)
 (*let word8Add=  word8BinOp  
-  (Instance_Num_NumAdd_Word_bitSequence.+)*)
+  (Instance_Num_NumAdd_Num_integer.+)*)
 
 (*val word8Minus : word8 -> word8 -> word8*)
 (*let word8Minus=  word8BinOp  
-  (Instance_Num_NumMinus_Word_bitSequence.-)*)
+  (Instance_Num_NumMinus_Num_integer.-)*)
 
 (*val word8Mult : word8 -> word8 -> word8*)
 (*let word8Mult=  word8BinOp  
-  ( Instance_Num_NumMult_Word_bitSequence.* )*)
+  ( Instance_Num_NumMult_Num_integer.* )*)
 
 (*val word8IntegerDivision : word8 -> word8 -> word8*)
 (*let word8IntegerDivision=  word8BinOp  
-  (Instance_Num_NumDivision_Word_bitSequence./)*)
+  (Instance_Num_NumDivision_Num_integer./)*)
 
 (*val word8Division : word8 -> word8 -> word8*)
 (*let word8Division=  word8BinOp  
-  Instance_Num_NumIntegerDivision_Word_bitSequence.div*)
+  Instance_Num_NumIntegerDivision_Num_integer.div*)
 
 (*val word8Remainder : word8 -> word8 -> word8*)
 (*let word8Remainder=  word8BinOp  
-  (Instance_Num_NumRemainder_Word_bitSequence.mod)*)
+  (Instance_Num_NumRemainder_Num_integer.mod)*)
 
 (*val word8Land : word8 -> word8 -> word8*)
 (*let word8Land=  word8BinOp  
-  (Instance_Word_WordAnd_Word_bitSequence.land)*)
+  (Instance_Word_WordAnd_Num_integer.land)*)
 
 (*val word8Lor : word8 -> word8 -> word8*)
 (*let word8Lor=  word8BinOp  
-  (Instance_Word_WordOr_Word_bitSequence.lor)*)
+  (Instance_Word_WordOr_Num_integer.lor)*)
 
 (*val word8Lxor : word8 -> word8 -> word8*)
 (*let word8Lxor=  word8BinOp  
-  (Instance_Word_WordXor_Word_bitSequence.lxor)*)
+  (Instance_Word_WordXor_Num_integer.lxor)*)
 
 (*val word8Min : word8 -> word8 -> word8*)
-(*let word8Min=  word8BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.min)*)
+(*let word8Min=  word8BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.min)*)
 
 (*val word8Max : word8 -> word8 -> word8*)
-(*let word8Max=  word8BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.max)*)
+(*let word8Max=  word8BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.max)*)
 
 (*val word8Power : word8 -> nat -> word8*)
 (*let word8Power=  word8NatOp  
-  ( Instance_Num_NumPow_Word_bitSequence.** )*)
+  ( Instance_Num_NumPow_Num_integer.** )*)
 
 (*val word8Asr : word8 -> nat -> word8*)
 (*let word8Asr=  word8NatOp  
-  (Instance_Word_WordAsr_Word_bitSequence.asr)*)
+  (Instance_Word_WordAsr_Num_integer.asr)*)
 
 (*val word8Lsr : word8 -> nat -> word8*)
 (*let word8Lsr=  word8NatOp  
-  (Instance_Word_WordLsr_Word_bitSequence.lsr)*)
+  (Instance_Word_WordLsr_Num_integer.lsr)*)
 
 (*val word8Lsl : word8 -> nat -> word8*)
 (*let word8Lsl=  word8NatOp  
-  (Instance_Word_WordLsl_Word_bitSequence.lsl)*)
+  (Instance_Word_WordLsl_Num_integer.lsl)*)
 
 
 definition instance_Num_NumNegate_Word8_word8_dict  :: "( 8 word)NumNegate_class "  where 
@@ -296,5 +338,8 @@ definition instance_Word_WordAsr_Word8_word8_dict  :: "( 8 word)WordAsr_class " 
 
   asr_method = (op>>>)|) )"
 
+
+(*val word8UGT : word8 -> word8 -> bool*)
+(*let word8UGT a b=  (Instance_Basic_classes_Ord_nat.>) (word8ToNat a) (word8ToNat b)*)
 
 end

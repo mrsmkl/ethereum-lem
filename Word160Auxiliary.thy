@@ -19,15 +19,14 @@ begin
 
 lemma bs_to_w160_def_lemma:
 " ((\<forall> seq.
-   (case  resizeBitSeq (Some (( 160 :: nat))) seq of
-         BitSeq _ s b => W160 s b
-   ) = (\<lambda> w .  word_of_int (integerFromBitSeq w)) seq)) "
+   W160 (integerFromBitSeq seq) =
+     (\<lambda> w .  word_of_int (integerFromBitSeq w)) seq)) "
 (* Theorem: bs_to_w160_def_lemma*)(* try *) by auto
 
 lemma w160_to_bs_def_lemma:
-" ((\<forall> s. \<forall> b.
-   BitSeq (Some (( 160 :: nat))) s b =
-     (\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) (W160 s b))) "
+" ((\<forall> i.
+   bitSeqFromInteger (Some (( 160 :: nat))) i =
+     (\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) (W160 i))) "
 (* Theorem: w160_to_bs_def_lemma*)(* try *) by auto
 
 lemma word160ToNat_def_lemma:
@@ -49,16 +48,11 @@ lemma word160ToInt_def_lemma:
 (* Theorem: word160ToInt_def_lemma*)(* try *) by auto
 
 lemma word160FromInteger_def_lemma:
-" ((\<forall> i.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger (Some (( 160 :: nat))) i) =
-     (\<lambda> i .  word_of_int ( i)) i)) "
+" ((\<forall> i. W160 (i mod base) = (\<lambda> i .  word_of_int ( i)) i)) "
 (* Theorem: word160FromInteger_def_lemma*)(* try *) by auto
 
 lemma word160FromInt_def_lemma:
-" ((\<forall> i.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger (Some (( 160 :: nat))) ( i)) = word_of_int i)) "
+" ((\<forall> i. W160 ( i mod base) = word_of_int i)) "
 (* Theorem: word160FromInt_def_lemma*)(* try *) by auto
 
 lemma word160FromBoollist_def_lemma:
@@ -74,116 +68,118 @@ lemma boolListFromWord160_def_lemma:
 " ((\<forall> w.
    boolListFrombitSeq (( 160 :: nat))
      ((\<lambda> w .  bitSeqFromInteger (Some 160) ( (sint w))) w) = 
-   of_bl w)) "
+   to_bl w)) "
 (* Theorem: boolListFromWord160_def_lemma*)(* try *) by auto
 
 lemma word160FromNumeral_def_lemma:
-" ((\<forall> w.
-   (\<lambda> w .  word_of_int (integerFromBitSeq w))
-     (bitSeqFromInteger None (( w :: int))) = ((word_of_int w) :: 160 word))) "
+" ((\<forall> w. W160 (( w :: int) mod base) = ((word_of_int w) :: 160 word))) "
 (* Theorem: word160FromNumeral_def_lemma*)(* try *) by auto
 
 lemma w160Less_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word160BinTest bitSeqLess bs1 bs2 = word_sless bs1 bs2)) "
+   word160BinTest (op<) bs1 bs2 = word_sless bs1 bs2)) "
 (* Theorem: w160Less_def_lemma*)(* try *) by auto
 
 lemma w160LessEqual_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word160BinTest bitSeqLessEqual bs1 bs2 = word_sle bs1 bs2)) "
+   word160BinTest (op \<le>) bs1 bs2 = word_sle bs1 bs2)) "
 (* Theorem: w160LessEqual_def_lemma*)(* try *) by auto
 
 lemma w160Greater_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word160BinTest bitSeqGreater bs1 bs2 = word_sless bs2 bs1)) "
+   word160BinTest (op>) bs1 bs2 = word_sless bs2 bs1)) "
 (* Theorem: w160Greater_def_lemma*)(* try *) by auto
 
 lemma w160GreaterEqual_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word160BinTest bitSeqGreaterEqual bs1 bs2 = word_sle bs2 bs1)) "
+   word160BinTest (op \<ge>) bs1 bs2 = word_sle bs2 bs1)) "
 (* Theorem: w160GreaterEqual_def_lemma*)(* try *) by auto
 
 lemma w160Compare_def_lemma:
 " ((\<forall> bs1. \<forall> bs2.
-   word160BinTest bitSeqCompare bs1 bs2 =
+   word160BinTest (genericCompare (op<) (op=)) bs1 bs2 =
      (genericCompare word_sless w160Eq bs1 bs2))) "
 (* Theorem: w160Compare_def_lemma*)(* try *) by auto
 
 lemma word160Negate_def_lemma:
-" (( word160UnaryOp bitSeqNegate = (\<lambda> i. - i))) "
+" (( word160UnaryOp (\<lambda> i. - i) = (\<lambda> i. - i))) "
 (* Theorem: word160Negate_def_lemma*)(* try *) by auto
 
 lemma word160Succ_def_lemma:
-" (( word160UnaryOp bitSeqSucc = (\<lambda> n. n + 1))) "
+" (( word160UnaryOp (\<lambda> n. n + ( 1 :: int)) = (\<lambda> n. n + 1))) "
 (* Theorem: word160Succ_def_lemma*)(* try *) by auto
 
 lemma word160Pred_def_lemma:
-" (( word160UnaryOp bitSeqPred = (\<lambda> n. n - 1))) "
+" (( word160UnaryOp (\<lambda> n. n - ( 1 :: int)) = (\<lambda> n. n - 1))) "
 (* Theorem: word160Pred_def_lemma*)(* try *) by auto
 
 lemma word160Lnot_def_lemma:
-" (( word160UnaryOp bitSeqNot = (\<lambda> w. (NOT w)))) "
+" (( word160UnaryOp integerLnot = (\<lambda> w. (NOT w)))) "
 (* Theorem: word160Lnot_def_lemma*)(* try *) by auto
 
 lemma word160Add_def_lemma:
-" (( word160BinOp bitSeqAdd = (op+))) "
+" (( word160BinOp (op+) = (op+))) "
 (* Theorem: word160Add_def_lemma*)(* try *) by auto
 
 lemma word160Minus_def_lemma:
-" (( word160BinOp bitSeqMinus = (op-))) "
+" (( word160BinOp (op-) = (op-))) "
 (* Theorem: word160Minus_def_lemma*)(* try *) by auto
 
 lemma word160Mult_def_lemma:
-" (( word160BinOp bitSeqMult = (op*))) "
+" (( word160BinOp (op*) = (op*))) "
 (* Theorem: word160Mult_def_lemma*)(* try *) by auto
 
 lemma word160IntegerDivision_def_lemma:
-" (( word160BinOp bitSeqDiv = (op div))) "
+" (( word160BinOp (op div) = (op div))) "
 (* Theorem: word160IntegerDivision_def_lemma*)(* try *) by auto
 
 lemma word160Division_def_lemma:
-" (( word160BinOp bitSeqDiv = (op div))) "
+" (( word160BinOp (op div) = (op div))) "
 (* Theorem: word160Division_def_lemma*)(* try *) by auto
 
 lemma word160Remainder_def_lemma:
-" (( word160BinOp bitSeqMod = (op mod))) "
+" (( word160BinOp (op mod) = (op mod))) "
 (* Theorem: word160Remainder_def_lemma*)(* try *) by auto
 
 lemma word160Land_def_lemma:
-" (( word160BinOp bitSeqAnd = (op AND))) "
+" (( word160BinOp integerLand = (op AND))) "
 (* Theorem: word160Land_def_lemma*)(* try *) by auto
 
 lemma word160Lor_def_lemma:
-" (( word160BinOp bitSeqOr = (op OR))) "
+" (( word160BinOp integerLor = (op OR))) "
 (* Theorem: word160Lor_def_lemma*)(* try *) by auto
 
 lemma word160Lxor_def_lemma:
-" (( word160BinOp bitSeqXor = (op XOR))) "
+" (( word160BinOp integerLxor = (op XOR))) "
 (* Theorem: word160Lxor_def_lemma*)(* try *) by auto
 
 lemma word160Min_def_lemma:
-" (( word160BinOp (bitSeqMin) = min)) "
+" (( word160BinOp (min) = min)) "
 (* Theorem: word160Min_def_lemma*)(* try *) by auto
 
 lemma word160Max_def_lemma:
-" (( word160BinOp (bitSeqMax) = max)) "
+" (( word160BinOp (max) = max)) "
 (* Theorem: word160Max_def_lemma*)(* try *) by auto
 
 lemma word160Power_def_lemma:
-" (( word160NatOp bitSeqPow = (op^))) "
+" (( word160NatOp (op^) = (op^))) "
 (* Theorem: word160Power_def_lemma*)(* try *) by auto
 
 lemma word160Asr_def_lemma:
-" (( word160NatOp bitSeqArithmeticShiftRight = (op>>>))) "
+" (( word160NatOp integerAsr = (op>>>))) "
 (* Theorem: word160Asr_def_lemma*)(* try *) by auto
 
 lemma word160Lsr_def_lemma:
-" (( word160NatOp bitSeqLogicalShiftRight = (op>>))) "
+" (( word160NatOp integerAsr = (op>>))) "
 (* Theorem: word160Lsr_def_lemma*)(* try *) by auto
 
 lemma word160Lsl_def_lemma:
-" (( word160NatOp bitSeqShiftLeft = (op<<))) "
+" (( word160NatOp integerLsl = (op<<))) "
 (* Theorem: word160Lsl_def_lemma*)(* try *) by auto
+
+lemma word160UGT_def_lemma:
+" ((\<forall> a. \<forall> b. (unat a > unat b) = a > b)) "
+(* Theorem: word160UGT_def_lemma*)(* try *) by auto
 
 
 

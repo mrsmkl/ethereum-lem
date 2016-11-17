@@ -87,6 +87,14 @@ val address_to_bytes : address -> list byte
 let address_to_bytes w = word_rsplit_aux (boolListFromWord160 w) 20 
 declare isabelle target_rep function address_to_bytes = `word_rsplit`
 
+val word_of_bytes : list byte -> uint
+let word_of_bytes lst = word256FromBoollist (List.concat (map boolListFromWord8 lst))
+declare isabelle target_rep function word_of_bytes = `word_rcat`
+
+val address_of_bytes : list byte -> address
+let address_of_bytes lst = word160FromBoollist (List.concat (map boolListFromWord8 lst))
+
+
 val get_byte : uint -> uint -> uint
 let get_byte position w =
   match List.index (word_rsplit w) (absnat position) with
@@ -678,12 +686,6 @@ end
 val datasize : variable_env -> uint
 let datasize v = word256FromNat (length v.venv_data_sent)
 
-val word_of_bytes : list byte -> uint
-let word_of_bytes lst = word256FromBoollist (List.concat (map boolListFromWord8 lst))
-
-val address_of_bytes : list byte -> address
-let address_of_bytes lst = word160FromBoollist (List.concat (map boolListFromWord8 lst))
-
 val read_word_from_bytes : nat -> list byte -> uint
 let read_word_from_bytes idx lst = word_of_bytes (take 32 (drop idx lst))
 
@@ -798,7 +800,7 @@ let ret v _ =  match v.venv_stack with
 end
 
 val stop : variable_env -> constant_env -> instruction_result
-let stop v _ = InstructionToWorld (ContractReturn []) v.venv_storage v.venv_balance Nothing
+let stop v _ = InstructionToWorld (ContractReturn []) v.venv_storage v.venv_balance (Just (v,0,0))
 
 val pop : variable_env -> constant_env -> instruction_result
 let pop v c = match v.venv_stack with
@@ -1227,7 +1229,7 @@ venv_returned:
         venv_block = v_block;
         venv_gas_left = v_gas_left;
      |>
-(*
+
 val respond_to_call_correctly : (call_env -> contract_behavior) -> account_state -> bool
 let respond_to_call_correctly c a =
   (forall call_env initial_venv resulting_action final_state_pred.
@@ -1277,7 +1279,5 @@ AccountStep: forall precond c r f.
    (forall a. precond a --> respond_to_return_correctly r a) &&
    (forall a. precond a --> respond_to_fail_correctly f a) ==>
    account_state_responds_to_world precond <| when_called = c; when_returned = r; when_failed = f |>
-
-*)
 
 

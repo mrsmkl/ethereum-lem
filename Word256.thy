@@ -9,39 +9,81 @@ imports
 
 begin 
 
+(*
+  Copyright 2016 Sami MÃ¤kelÃ¤
+
+   Licensed under the Apache License, Version 2.0 (the License);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an AS IS BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*)
 
 (*open import Pervasives*)
 (*open import Word*)
 
-(*type word256 = W256 of bool * list bool*)
+(*type word256 = W256 of integer*)
 
 (* perhaps should truncate here? *)
 (*val bs_to_w256 : bitSequence -> word256*)
-(*let bs_to_w256 seq=  match resizeBitSeq (Just 256) seq with
- | BitSeq _ s b -> W256 s b
-end*)
+(*let bs_to_w256 seq=  W256 (integerFromBitSeq seq)*)
 
 (*val w256_to_bs : word256 -> bitSequence*)
-(*let w256_to_bs (W256 s b)=  BitSeq (Just 256) s b*)
+(*let w256_to_bs (W256 i)=  bitSeqFromInteger (Just 256) i*)
 
-(*val word256BinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word256 -> word256 -> 'a*)
-definition word256BinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 'a "  where 
-     " word256BinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w2))"
-
-
-(*val word256BinOp : (bitSequence -> bitSequence -> bitSequence) -> word256 -> word256 -> word256*)
-definition word256BinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
-     " word256BinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w2)))"
+(*val base : integer*)
+definition base  :: " int "  where 
+     " base = (( 2 :: int)^( 256 :: nat))"
 
 
-(*val word256NatOp : (bitSequence -> nat -> bitSequence) -> word256 -> nat -> word256*)
-definition word256NatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> nat \<Rightarrow> 256 word "  where 
-     " word256NatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) n))"
+(*val word256BinTest : forall 'a. (integer -> integer -> 'a) -> word256 -> word256 -> 'a*)
+fun word256BinTest  :: "(int \<Rightarrow> int \<Rightarrow> 'a)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 'a "  where 
+     " word256BinTest binop (W256 w1) (W256 w2) = ( binop (w1 mod base) (w2 mod base))" 
+declare word256BinTest.simps [simp del]
 
 
-(*val word256UnaryOp : (bitSequence -> bitSequence) -> word256 -> word256*)
-definition word256UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
-     " word256UnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w)))"
+(*val word256BBinTest : forall 'a. (bitSequence -> bitSequence -> 'a) -> word256 -> word256 -> 'a*)
+definition word256BBinTest  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> 'a)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 'a "  where 
+     " word256BBinTest binop w1 w2 = ( binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w2))"
+
+
+(*val word256BinOp : (integer -> integer -> integer) -> word256 -> word256 -> word256*)
+fun word256BinOp  :: "(int \<Rightarrow> int \<Rightarrow> int)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
+     " word256BinOp binop (W256 w1) (W256 w2) = ( W256 (binop (w1 mod base) (w2 mod base) mod base))" 
+declare word256BinOp.simps [simp del]
+
+
+(*val word256BBinOp : (bitSequence -> bitSequence -> bitSequence) -> word256 -> word256 -> word256*)
+definition word256BBinOp  :: "(bitSequence \<Rightarrow> bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
+     " word256BBinOp binop w1 w2 = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w2)))"
+
+
+(*val word256NatOp : (integer -> nat -> integer) -> word256 -> nat -> word256*)
+fun word256NatOp  :: "(int \<Rightarrow> nat \<Rightarrow> int)\<Rightarrow> 256 word \<Rightarrow> nat \<Rightarrow> 256 word "  where 
+     " word256NatOp binop (W256 w1) n = ( W256  (binop (w1 mod base) n mod base))" 
+declare word256NatOp.simps [simp del]
+
+
+(*val word256BNatOp : (bitSequence -> nat -> bitSequence) -> word256 -> nat -> word256*)
+definition word256BNatOp  :: "(bitSequence \<Rightarrow> nat \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> nat \<Rightarrow> 256 word "  where 
+     " word256BNatOp binop w1 n = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (binop ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w1) n))"
+
+
+(*val word256BUnaryOp : (bitSequence -> bitSequence) -> word256 -> word256*)
+definition word256BUnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
+     " word256BUnaryOp op1 w = ( (\<lambda> w .  word_of_int (integerFromBitSeq w)) (op1 ((\<lambda> w .  bitSeqFromInteger (Some 256) ( (sint w))) w)))"
+
+
+(*val word256UnaryOp : (integer -> integer) -> word256 -> word256*)
+fun word256UnaryOp  :: "(int \<Rightarrow> int)\<Rightarrow> 256 word \<Rightarrow> 256 word "  where 
+     " word256UnaryOp op1 (W256 w) = ( W256 (op1 w mod base))" 
+declare word256UnaryOp.simps [simp del]
 
 
 (*val word256ToNat : word256 -> nat*)
@@ -51,10 +93,10 @@ definition word256UnaryOp  :: "(bitSequence \<Rightarrow> bitSequence)\<Rightarr
 (*let word256ToInt w=  intFromInteger (integerFromBitSeq (w256_to_bs w))*)
 
 (*val word256FromInteger : integer -> word256*)
-(*let word256FromInteger i=  bs_to_w256 (bitSeqFromInteger (Just 256) i)*)
+(*let word256FromInteger i=  W256 ((Instance_Num_NumRemainder_Num_integer.mod) i base)*)
 
 (*val word256FromInt : int -> word256*)
-(*let word256FromInt i=  bs_to_w256 (bitSeqFromInteger (Just 256) (integerFromInt i))*)
+(*let word256FromInt i=  W256 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromInt i) base)*)
 
 (*val word256FromNat : nat -> word256*)
 definition word256FromNat  :: " nat \<Rightarrow> 256 word "  where 
@@ -71,7 +113,7 @@ end*)
 (*let boolListFromWord256 w=  boolListFrombitSeq 256 (w256_to_bs w)*)
 
 (*val word256FromNumeral : numeral -> word256*)
-(*let word256FromNumeral w=  bs_to_w256 (Instance_Num_Numeral_Word_bitSequence.fromNumeral w)*)
+(*let word256FromNumeral w=  W256 ((Instance_Num_NumRemainder_Num_integer.mod) (integerFromNumeral w) base)*)
 
 (*val w256Eq : word256 -> word256 -> bool*)
 definition w256Eq  :: " 256 word \<Rightarrow> 256 word \<Rightarrow> bool "  where 
@@ -80,23 +122,23 @@ definition w256Eq  :: " 256 word \<Rightarrow> 256 word \<Rightarrow> bool "  wh
 
 (*val w256Less : word256 -> word256 -> bool*)
 (*let w256Less bs1 bs2=  word256BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<) bs1 bs2*)
 
 (*val w256LessEqual : word256 -> word256 -> bool*)
 (*let w256LessEqual bs1 bs2=  word256BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.<=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.<=) bs1 bs2*)
 
 (*val w256Greater : word256 -> word256 -> bool*)
 (*let w256Greater bs1 bs2=  word256BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>) bs1 bs2*)
 
 (*val w256GreaterEqual : word256 -> word256 -> bool*)
 (*let w256GreaterEqual bs1 bs2=  word256BinTest  
-  (Instance_Basic_classes_Ord_Word_bitSequence.>=) bs1 bs2*)
+  (Instance_Basic_classes_Ord_Num_integer.>=) bs1 bs2*)
 
 (*val w256Compare : word256 -> word256 -> ordering*)
 (*let w256Compare bs1 bs2=  word256BinTest  
-  Instance_Basic_classes_Ord_Word_bitSequence.compare bs1 bs2*)
+  Instance_Basic_classes_Ord_Num_integer.compare bs1 bs2*)
 
 definition instance_Basic_classes_Ord_Word256_word256_dict  :: "( 256 word)Ord_class "  where 
      " instance_Basic_classes_Ord_Word256_word256_dict = ((|
@@ -114,77 +156,77 @@ definition instance_Basic_classes_Ord_Word256_word256_dict  :: "( 256 word)Ord_c
 
 (*val word256Negate : word256 -> word256*)
 (*let word256Negate=  word256UnaryOp  
-  Instance_Num_NumNegate_Word_bitSequence.~*)
+  Instance_Num_NumNegate_Num_integer.~*)
 
 (*val word256Succ : word256 -> word256*)
 (*let word256Succ=  word256UnaryOp  
-  Instance_Num_NumSucc_Word_bitSequence.succ*)
+  Instance_Num_NumSucc_Num_integer.succ*)
 
 (*val word256Pred : word256 -> word256*)
 (*let word256Pred=  word256UnaryOp  
-  Instance_Num_NumPred_Word_bitSequence.pred*)
+  Instance_Num_NumPred_Num_integer.pred*)
 
 (*val word256Lnot : word256 -> word256*)
 (*let word256Lnot=  word256UnaryOp  
-  Instance_Word_WordNot_Word_bitSequence.lnot*)
+  Instance_Word_WordNot_Num_integer.lnot*)
 
 (*val word256Add : word256 -> word256 -> word256*)
 (*let word256Add=  word256BinOp  
-  (Instance_Num_NumAdd_Word_bitSequence.+)*)
+  (Instance_Num_NumAdd_Num_integer.+)*)
 
 (*val word256Minus : word256 -> word256 -> word256*)
 (*let word256Minus=  word256BinOp  
-  (Instance_Num_NumMinus_Word_bitSequence.-)*)
+  (Instance_Num_NumMinus_Num_integer.-)*)
 
 (*val word256Mult : word256 -> word256 -> word256*)
 (*let word256Mult=  word256BinOp  
-  ( Instance_Num_NumMult_Word_bitSequence.* )*)
+  ( Instance_Num_NumMult_Num_integer.* )*)
 
 (*val word256IntegerDivision : word256 -> word256 -> word256*)
 (*let word256IntegerDivision=  word256BinOp  
-  (Instance_Num_NumDivision_Word_bitSequence./)*)
+  (Instance_Num_NumDivision_Num_integer./)*)
 
 (*val word256Division : word256 -> word256 -> word256*)
 (*let word256Division=  word256BinOp  
-  Instance_Num_NumIntegerDivision_Word_bitSequence.div*)
+  Instance_Num_NumIntegerDivision_Num_integer.div*)
 
 (*val word256Remainder : word256 -> word256 -> word256*)
 (*let word256Remainder=  word256BinOp  
-  (Instance_Num_NumRemainder_Word_bitSequence.mod)*)
+  (Instance_Num_NumRemainder_Num_integer.mod)*)
 
 (*val word256Land : word256 -> word256 -> word256*)
 (*let word256Land=  word256BinOp  
-  (Instance_Word_WordAnd_Word_bitSequence.land)*)
+  (Instance_Word_WordAnd_Num_integer.land)*)
 
 (*val word256Lor : word256 -> word256 -> word256*)
 (*let word256Lor=  word256BinOp  
-  (Instance_Word_WordOr_Word_bitSequence.lor)*)
+  (Instance_Word_WordOr_Num_integer.lor)*)
 
 (*val word256Lxor : word256 -> word256 -> word256*)
 (*let word256Lxor=  word256BinOp  
-  (Instance_Word_WordXor_Word_bitSequence.lxor)*)
+  (Instance_Word_WordXor_Num_integer.lxor)*)
 
 (*val word256Min : word256 -> word256 -> word256*)
-(*let word256Min=  word256BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.min)*)
+(*let word256Min=  word256BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.min)*)
 
 (*val word256Max : word256 -> word256 -> word256*)
-(*let word256Max=  word256BinOp (Instance_Basic_classes_OrdMaxMin_Word_bitSequence.max)*)
+(*let word256Max=  word256BinOp (Instance_Basic_classes_OrdMaxMin_Num_integer.max)*)
 
 (*val word256Power : word256 -> nat -> word256*)
 (*let word256Power=  word256NatOp  
-  ( Instance_Num_NumPow_Word_bitSequence.** )*)
+  ( Instance_Num_NumPow_Num_integer.** )*)
 
 (*val word256Asr : word256 -> nat -> word256*)
 (*let word256Asr=  word256NatOp  
-  (Instance_Word_WordAsr_Word_bitSequence.asr)*)
+  (Instance_Word_WordAsr_Num_integer.asr)*)
 
 (*val word256Lsr : word256 -> nat -> word256*)
 (*let word256Lsr=  word256NatOp  
-  (Instance_Word_WordLsr_Word_bitSequence.lsr)*)
+  (Instance_Word_WordLsr_Num_integer.lsr)*)
 
 (*val word256Lsl : word256 -> nat -> word256*)
 (*let word256Lsl=  word256NatOp  
-  (Instance_Word_WordLsl_Word_bitSequence.lsl)*)
+  (Instance_Word_WordLsl_Num_integer.lsl)*)
 
 
 definition instance_Num_NumNegate_Word256_word256_dict  :: "( 256 word)NumNegate_class "  where 
@@ -296,5 +338,8 @@ definition instance_Word_WordAsr_Word256_word256_dict  :: "( 256 word)WordAsr_cl
 
   asr_method = (op>>>)|) )"
 
+
+(*val word256UGT : word256 -> word256 -> bool*)
+(*let word256UGT a b=  (Instance_Basic_classes_Ord_nat.>) (word256ToNat a) (word256ToNat b)*)
 
 end
