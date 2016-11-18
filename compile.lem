@@ -19,6 +19,7 @@ open import Evm
 open import Word8
 open import Rlp
 
+(*
 let rec big_step c v = match v.venv_gas_left with
  | 0 -> ProgramStepRunOut
  | _ ->
@@ -32,6 +33,44 @@ let rec big_step c v = match v.venv_gas_left with
       end
    end
 end
+*)
+
+type program_state =
+ | Continue of variable_env * nat * nat
+ | Return of program_result
+
+val program_step : constant_env -> program_state -> program_state
+let program_step c st = match st with
+| Continue v tiny_step remaining_steps ->
+  match remaining_steps with
+  | 0 -> Return ProgramStepRunOut
+  | remaining_steps + 1 ->
+   if tiny_step <= 0 then
+     Return (ProgramToWorld ContractFail v.venv_storage_at_call v.venv_balance_at_call Nothing) else
+   if not (check_annotations v c) then Return ProgramAnnotationFailure else
+   match venv_next_instruction v c with
+    | Nothing -> Return ProgramStepRunOut
+    | Just i ->
+      match instruction_sem v c i with
+      | InstructionContinue new_v ->
+         if new_v.venv_pc > v.venv_pc then Continue new_v (tiny_step - 1) (remaining_steps+1)
+         else Continue new_v c.cenv_program.program_length remaining_steps
+      | InstructionToWorld a st bal opt_pushed_v -> Return (ProgramToWorld a st bal opt_pushed_v)
+      | _ -> Return ProgramInvalid
+      end
+   end
+  end
+| Return r -> Return r
+end
+
+val program_iter : constant_env -> program_state -> nat -> program_state
+let rec program_iter c st n = match n with
+ | n+1 -> program_iter c (program_step c st) n
+ | 0 -> st
+end
+declare termination_argument program_iter = automatic
+
+theorem program_iter_bigstep : forall x c v n k steps. (Return x = program_iter c (Continue v n k) steps) --> (program_sem v c n k = x)
 
 (* expressions *)
 

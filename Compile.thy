@@ -12,7 +12,7 @@ imports
 begin 
 
 (*
-  Copyright 2016 Sami MÃ\<currency>kelÃ\<currency>
+  Copyright 2016 Sami MÃ¤kelÃ¤
 
    Licensed under the Apache License, Version 2.0 (the License);
    you may not use this file except in compliance with the License.
@@ -32,21 +32,56 @@ begin
 (*open import Word8*)
 (*open import Rlp*)
 
-function (sequential,domintros)  big_step  :: " constant_env \<Rightarrow> variable_env \<Rightarrow> program_result "  where 
-     " big_step c v = ( (case (venv_gas_left   v) of
-   0 => ProgramStepRunOut
- | _ =>
+(*
+let rec big_step c v = match v.venv_gas_left with
+ | 0 -> ProgramStepRunOut
+ | _ ->
+   match venv_next_instruction v c with
+    | Nothing -> ProgramStepRunOut
+    | Just i ->
+      match instruction_sem v c i with
+      | InstructionContinue new_v -> big_step c new_v
+      | InstructionToWorld a st bal opt_pushed_v -> ProgramToWorld a st bal opt_pushed_v
+      | _ -> ProgramInvalid
+      end
+   end
+end
+*)
+
+datatype program_state =
+   Continue " variable_env " " nat " " nat "
+ | Return " program_result "
+
+(*val program_step : constant_env -> program_state -> program_state*)
+fun program_step  :: " constant_env \<Rightarrow> program_state \<Rightarrow> program_state "  where 
+     " program_step c (Continue v tiny_step remaining_steps) = (
+  (case  remaining_steps of
+    0 => Return ProgramStepRunOut
+  |  (Suc remaining_steps) =>
+   if tiny_step \<le>( 0 :: nat) then
+     Return (ProgramToWorld ContractFail(venv_storage_at_call   v)(venv_balance_at_call   v) None) else
+   if \<not> (check_annotations v c) then Return ProgramAnnotationFailure else
    (case  venv_next_instruction v c of
-      None => ProgramStepRunOut
+      None => Return ProgramStepRunOut
     | Some i =>
       (case  instruction_sem v c i of
-        InstructionContinue new_v => big_step c new_v
-      | InstructionToWorld a st bal opt_pushed_v => ProgramToWorld a st bal opt_pushed_v
-      | _ => ProgramInvalid
+        InstructionContinue new_v =>
+         if(venv_pc   new_v) >(venv_pc   v) then Continue new_v (tiny_step -( 1 :: nat)) (remaining_steps+( 1 :: nat))
+         else Continue new_v(program_length  (cenv_program   c)) remaining_steps
+      | InstructionToWorld a st bal opt_pushed_v => Return (ProgramToWorld a st bal opt_pushed_v)
+      | _ => Return ProgramInvalid
       )
    )
-))" 
-by pat_completeness auto
+  ))"
+|" program_step c (Return r) = ( Return r )" 
+declare program_step.simps [simp del]
+
+
+(*val program_iter : constant_env -> program_state -> nat -> program_state*)
+fun  program_iter  :: " constant_env \<Rightarrow> program_state \<Rightarrow> nat \<Rightarrow> program_state "  where 
+     " program_iter c st ((Suc n)) = ( program_iter c (program_step c st) n )"
+|" program_iter c st 0 = ( st )" 
+declare program_iter.simps [simp del]
 
 
 (* expressions *)
@@ -87,7 +122,7 @@ declare get_stack_top.simps [simp del]
 
 definition eval_expr  :: " variable_env \<Rightarrow> 160 word \<Rightarrow>(inst)list \<Rightarrow>( 256 word)option "  where 
      " eval_expr v addr prog = (
-  get_stack_top (program_sem  (v (| venv_pc :=(( 0 :: nat)) |)) (| cenv_program = (program_of_lst (prog @ [Misc STOP])), cenv_this = addr |)(( 100 :: nat))(( 100 :: nat))))"
+  get_stack_top (program_sem ( v (| venv_pc :=(( 0 :: nat)) |)) (| cenv_program = (program_of_lst (prog @ [Misc STOP])), cenv_this = addr |)(( 100 :: nat))(( 100 :: nat))))"
 
 
 datatype binop = Add | Minus
