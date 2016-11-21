@@ -156,6 +156,61 @@ theorem iter_runout [simp] :
 apply(auto simp:program_sem.simps)
 done
 
+theorem step_foo : "\<exists>steps.
+       program_iter c s1 (Suc steps) = s2 \<Longrightarrow>
+\<exists>steps. program_iter c s1 steps = s2"
+apply(blast)
+done
+
+theorem iter2_inst_continue1 [simp] :
+ "\<lbrakk> check_annotations v c;  venv_next_instruction v c = Some i;
+    instruction_sem v c i = InstructionContinue new_v;
+    venv_pc v < venv_pc new_v;
+    \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k))\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(subst program_sem.simps)
+apply(auto)
+apply(simp add: strict_if_def)
+done
+
+theorem iter2_inst_continue2 [simp] :
+ "\<lbrakk> check_annotations v c;  venv_next_instruction v c = Some i;
+    instruction_sem v c i = InstructionContinue new_v;
+    venv_pc v \<ge> venv_pc new_v;
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(subst program_sem.simps)
+apply(auto)
+apply(simp add: strict_if_def)
+done
+
+theorem iter2_inst_continue [simp] :
+ "\<lbrakk> check_annotations v c;  venv_next_instruction v c = Some i;
+    instruction_sem v c i = InstructionContinue new_v;
+    \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k));
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(cases " venv_pc v < venv_pc new_v")
+apply(rule iter2_inst_continue1)
+apply(clarify)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(rule iter2_inst_continue2)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(arith)
+apply(blast)
+done
 
 declare program_iter.simps [simp del]
 declare program_step.simps [simp del]
@@ -213,6 +268,24 @@ apply(blast)
 apply(auto)
 done
 
+theorem iter2_aux1 [simp] :
+ "\<lbrakk> check_annotations v c;  venv_next_instruction v c = Some i;
+    \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k));
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(cases "instruction_sem v c i")
+apply(rule iter2_inst_continue)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(blast)
+apply(auto)
+done
+
 theorem iter_aux2 :
  "\<lbrakk> check_annotations v c;
     \<forall>vv xx. (program_iter c (Continue vv n (Suc k)) steps = Return xx \<longrightarrow>
@@ -232,6 +305,19 @@ apply(rule iter_aux1)
 apply(auto)
 done
 
+theorem iter2_aux2 [simp] :
+ "\<lbrakk> check_annotations v c;
+    \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k));
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(cases "venv_next_instruction v c")
+defer
+apply(rule iter2_aux1)
+apply(auto)
+done
 
 theorem iter_aux3 :
  "\<lbrakk> \<forall>vv xx. (program_iter c (Continue vv n (Suc k)) steps = Return xx \<longrightarrow>
@@ -246,6 +332,30 @@ theorem iter_aux3 :
   Return (program_sem v c (Suc n) (Suc k))"
 apply(cases "check_annotations v c")
 apply(rule iter_aux2)
+apply(auto)
+done
+
+theorem iter2_aux3 [simp] :
+ "\<lbrakk> \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k));
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) (Suc steps) =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(cases "check_annotations v c")
+apply(rule iter2_aux2)
+apply(auto)
+done
+
+theorem iter2_aux4 [simp] :
+ "\<lbrakk> \<forall>vv. \<exists>steps. program_iter c (Continue vv n (Suc k)) steps =
+         Return (program_sem vv c n (Suc k));
+    \<forall>vv nn. \<exists>steps. program_iter c (Continue vv nn k) steps =
+         Return (program_sem vv c nn k)\<rbrakk> \<Longrightarrow>
+  \<exists>steps. program_iter c (Continue v (Suc n) (Suc k)) steps =
+  Return (program_sem v c (Suc n) (Suc k))"
+apply(rule step_foo)
+apply(rule iter2_aux3)
 apply(auto)
 done
 
@@ -347,7 +457,29 @@ apply(subst iter_correct_def)
 apply(auto)
 done
 
+theorem iter_exists_aux [simp] :
+"(\<And>v n.
+           \<exists>steps.
+              program_iter c (Continue v n k) steps =
+              Return (program_sem v c n k)) \<Longrightarrow>
+       \<exists>steps.
+          program_iter c (Continue v n (Suc k)) steps =
+          Return (program_sem v c n (Suc k))"
+apply(induction n arbitrary:v k)
+apply(rule_tac x = 1 in exI)
+apply(simp add:program_iter.simps program_sem.simps program_step.simps)
+apply(rule iter2_aux4)
+defer
+apply(blast)
+apply(auto)
+done
 
+theorem iter_exists :
+   "\<exists>steps. program_iter c (Continue v n k) steps = Return (program_sem v c n k)"
+apply(induction k arbitrary:v n)
+apply(rule_tac x = 1 in exI)
+apply(auto)
+done
 (*
 value "size (0::256 word)"
 
@@ -583,12 +715,96 @@ apply(auto simp:foo2)
 apply (metis word_rcat_rsplit)
 done
 
+fun get_stack_top2  :: " program_state \<Rightarrow>( 256 word)option "  where 
+  " get_stack_top2 (Continue s _ _) = ( None )"
+| " get_stack_top2 (Return a) = get_stack_top a"
 
+definition make_prog :: "inst list \<Rightarrow> address \<Rightarrow> constant_env" where
+"make_prog prog addr = (|
+   cenv_program = (program_of_lst (prog @ [Misc STOP])),
+   cenv_this = addr |)"
+
+definition iter_expr  :: "nat \<Rightarrow> variable_env \<Rightarrow> 160 word \<Rightarrow>(inst)list \<Rightarrow>( 256 word)option "  where 
+"iter_expr x v addr prog =
+  get_stack_top2 (program_iter
+      (make_prog prog addr)
+      (Continue ( v (| venv_pc :=(( 0 :: nat)) |)) 0 0)
+      x)"
+
+theorem iter_add : 
+  "program_iter c (program_iter c st y) x = program_iter c st (x+y)"
+apply(induction y arbitrary: st x)
+apply(auto simp:program_iter.simps)
+done
+
+theorem iter_suc :
+ "program_iter c st (Suc x) = program_step c (program_iter c st x)"
+apply(induction x arbitrary: st)
+apply(auto simp:program_iter.simps)
+done
+
+theorem iter_return_stable :
+  "program_iter c st x = Return rt \<Longrightarrow>
+   program_iter c st (Suc x) = Return rt"
+apply(induction x arbitrary:st)
+apply(auto simp:program_iter.simps program_step.simps)
+done
+
+theorem last_iter_aux :
+"(\<And>v a1 a2.
+           program_iter c (Continue v a1 a2) x =
+           Return rt \<Longrightarrow>
+           \<exists>y nv e1 e2.
+              program_iter c (Continue v a1 a2)
+               y =
+              Continue nv e1 e2 \<and>
+              program_step c
+               (Continue nv e1 e2) =
+              Return rt) \<Longrightarrow>
+       program_iter c (Continue v a1 a2)
+        (Suc x) =
+       Return rt \<Longrightarrow>
+       \<exists>y nv e1 e2.
+          program_iter c (Continue v a1 a2) y =
+          Continue nv e1 e2 \<and>
+          program_step c (Continue nv e1 e2) =
+          Return rt"
+apply(cases " program_iter c (Continue v a1 a2) x")
+apply(simp add:iter_suc)
+apply(blast)
+apply(simp add:iter_return_stable)
+done
+
+theorem last_iter :
+  "program_iter c (Continue v a1 a2) x = Return rt \<Longrightarrow>
+  \<exists>y nv e1 e2. program_iter c (Continue v a1 a2) y = Continue nv e1 e2 \<and>
+     program_step c (Continue nv e1 e2) = Return rt"
+apply(induction x arbitrary: v a1 a2 )
+apply(auto)
+apply(rule last_iter_aux)
+apply(auto)
+done
+
+fun maybe_eq :: "'a option \<Rightarrow> 'a option \<Rightarrow> bool" where
+  "maybe_eq (Some a) (Some b) = (a = b)"
+| "maybe_eq _ _ = True"
+
+theorem expr_stop :
+  "eval_expr v addr (compile_expr expr) = Some res  \<Longrightarrow>
+  \<exists> nv x e1 e2. program_iter
+            (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
+          Continue nv e1 e2 \<and> 
+          venv_next_instruction nv c = Some (Misc STOP)"
+apply(auto)
 
 theorem expr_correct :
-"( \<forall> expr.  \<forall> v.  \<forall> addr.  eval_expr v addr (compile_expr expr) = get_expr v expr)"
-(* Theorem: expr_correct*)(* try *) by auto
-
-
+"maybe_eq (eval_expr v addr (compile_expr expr)) (get_expr v expr)"
+(* Theorem: expr_correct*)(* try *)
+apply(induction expr)
+apply(subst compile_expr.simps)
+apply(subst get_expr.simps)
+apply(rule simple_correct)
+apply(subst compile_expr.simps)
+apply(subst get_expr.simps)
 
 end
