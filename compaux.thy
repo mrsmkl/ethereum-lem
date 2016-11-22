@@ -789,13 +789,481 @@ fun maybe_eq :: "'a option \<Rightarrow> 'a option \<Rightarrow> bool" where
   "maybe_eq (Some a) (Some b) = (a = b)"
 | "maybe_eq _ _ = True"
 
+theorem expr_stop_aux2 :
+   "program_sem (v\<lparr>venv_pc:=0\<rparr>) c 100 100 =
+    ProgramStepRunOut \<Longrightarrow>
+   get_stack_top (program_sem (v\<lparr>venv_pc:=0\<rparr>) c 100 100) = None"
+apply(auto simp:make_prog_def)
+done
+
+declare program_sem.psimps [simp del]
+
+theorem expr_stop_foo :
+  "\<lbrakk> program_sem (v\<lparr>venv_pc:=0\<rparr>) c 100 100 =
+    ProgramStepRunOut;
+   get_stack_top (program_sem (v\<lparr>venv_pc:=0\<rparr>) c 100 100) = Some x
+  \<rbrakk> \<Longrightarrow>
+  False"
+apply(auto)
+done
+
+theorem expr_stop_aux3 : 
+  "get_stack_top (ProgramToWorld x21 x22 x23 t) = Some x \<Longrightarrow>
+  \<exists>nv n k. t = Some (nv,n,k)"
+apply(cases t)
+apply(auto)
+done
+
+theorem expr_stop_aux :
+  "eval_expr v addr code = Some res  \<Longrightarrow>
+   \<exists>act stor bal nv n k. program_sem (v\<lparr> venv_pc := 0\<rparr>) (make_prog code addr) 100 100 =
+    ProgramToWorld act stor bal (Some (nv, n, k))"
+apply(simp add:make_prog_def)
+apply(cases " program_sem (v\<lparr> venv_pc := 0\<rparr>)  \<lparr>cenv_program =
+          \<lparr>program_content =
+             program_content_of_lst 0
+              (code @ [Misc STOP]),
+             program_length = Suc (length code),
+             program_annotation =
+               program_annotation_of_lst 0
+                (code @ [Misc STOP])\<rparr>,
+          cenv_this = addr\<rparr> 100 100")
+apply(auto)
+apply(auto simp:expr_stop_aux3)
+done
+
+theorem expr_stop_aux11 :
+  "\<exists>act stor bal nv n k. (eval_expr v addr code = Some res \<longrightarrow>
+   program_sem (v\<lparr> venv_pc := 0\<rparr>) (make_prog code addr) 100 100 =
+    ProgramToWorld act stor bal (Some (nv, n, k)))"
+apply(auto simp:expr_stop_aux)
+done
+
+theorem iter_exists_foo :
+ "program_sem v c n k = rt \<Longrightarrow>
+  \<exists>x. program_iter c (Continue v n k) x = Return rt"
+apply(auto simp:iter_exists)
+done
+
+theorem iter_exists_foo2 :
+ "program_sem v c n k =
+  ProgramToWorld act stor bal (Some (nv, n2, k2)) \<Longrightarrow>
+  \<exists>x. program_iter c (Continue v n k) x =
+      Return (ProgramToWorld act stor bal (Some (nv, n2, k2)))"
+apply(auto simp:iter_exists_foo)
+done
+
+theorem iter_exists_foo3 :
+  "\<exists>x. program_iter c (Continue v n k) x =
+      Return (ProgramToWorld act stor bal (Some (nv, n2, k2)))
+\<Longrightarrow> \<exists>act stor bal nv n2 k2 x. program_iter c (Continue v n k) x =
+      Return (ProgramToWorld act stor bal (Some (nv, n2, k2)))"
+apply(blast)
+done
+
+theorem iter_exists_foo4 :
+"program_sem v c n k =
+  ProgramToWorld act stor bal (Some (nv, n2, k2)) \<Longrightarrow>
+ \<exists>act stor bal nv n2 k2 x. program_iter c (Continue v n k) x =
+      Return (ProgramToWorld act stor bal (Some (nv, n2, k2)))"
+apply(rule iter_exists_foo3)
+apply(rule iter_exists_foo2)
+apply(blast)
+done
+
+theorem iter_exists_foo5 :
+"(\<exists>act stor bal nv n2 k2 x. program_sem v c n k =
+  ProgramToWorld act stor bal (Some (nv, n2, k2))) \<longrightarrow>
+ (\<exists>act stor bal nv n2 k2 x. program_iter c (Continue v n k) x =
+      Return (ProgramToWorld act stor bal (Some (nv, n2, k2))))"
+apply(auto simp:iter_exists_foo4)
+done
+
+declare expr_stop_aux [simp]
+
+theorem expr_stop_aux4 :
+  "eval_expr v addr (compile_expr expr) = Some res  \<Longrightarrow>
+  \<exists>act stor bal nv n k x.
+    program_iter (make_prog (compile_expr expr) addr)
+      (Continue (v\<lparr>venv_pc:=0\<rparr>) 100 100) x =
+    Return (ProgramToWorld act stor bal (Some (nv, n, k)))"
+apply(auto simp:iter_exists_foo5)
+done
+
+fun simple_inst :: "inst \<Rightarrow> bool" where
+  "simple_inst (Misc STOP) = False"
+| "simple_inst (Misc RETURN) = False"
+| "simple_inst (Misc CALL) = False"
+| "simple_inst (Misc CREATE) = False"
+| "simple_inst (Misc CALLCODE) = False"
+| "simple_inst (Misc SUICIDE) = False"
+| "simple_inst (Misc DELEGATECALL) = False"
+| "simple_inst _ = True"
+
+theorem compiled_simple_aux1 :
+"xa \<in> set (compile_simple x) \<Longrightarrow> simple_inst xa"
+apply(cases x)
+apply(auto)
+done
+
+theorem compiled_simple_aux2 :
+"x \<in> set (binop_inst x1a) \<Longrightarrow> simple_inst x"
+apply(cases x1a)
+apply(auto simp:binop_inst.simps)
+done
+
+theorem compiled_simple_aux3 :
+"x \<in> set (unop_inst x1a) \<Longrightarrow> simple_inst x"
+apply(cases x1a)
+apply(auto simp:unop_inst.simps)
+done
+
+(* Compiled instructions are simple *)
+theorem compiled_simple :
+   "x \<in> set (compile_expr expr) \<Longrightarrow> simple_inst x"
+apply(induction expr arbitrary:x)
+apply(auto simp: compiled_simple_aux1 compiled_simple_aux2 compiled_simple_aux3)
+done
+
+(* Simple instructions do not return normally *)
+
+fun will_return :: "inst option \<Rightarrow> bool" where
+  "will_return (Some x) = (\<not> simple_inst x)"
+| "will_return None = False"
+
+theorem no_inst_error : "venv_next_instruction v c = None \<Longrightarrow>
+  program_step c (Continue v n k) \<noteq>
+   Return (ProgramToWorld act stor bal (Some (nv, n, k)))"
+apply(auto simp:program_step.simps)
+apply(cases k)
+apply(auto)
+apply(cases n)
+apply(simp)
+apply(cases "\<not> check_annotations v c")
+apply(simp)
+apply(cases "check_annotations v c")
+defer
+apply(blast)
+apply (metis lame nat.distinct(1) option.simps(4) program_result.distinct(1) venv_next_instruction_def)
+done
+
+theorem name_1 :
+   "check_annotations v c \<Longrightarrow> (\<not> check_annotations v c) = False"
+apply(blast)
+done
+
+declare check_annotations_def [simp del]
+
+theorem blahblah [simp] :
+"stack_2_1_op v c x  \<noteq>
+    InstructionToWorld act stor bal (Some (nv, n, k))"
+apply(auto simp:stack_2_1_op_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+done
+
+theorem blahblah2 [simp] :
+"stack_1_1_op v c x  \<noteq>
+    InstructionToWorld act stor bal (Some (nv, n, k))"
+apply(auto simp:stack_2_1_op_def)
+apply(cases "venv_stack v")
+apply(auto)
+done
+
+theorem blahblah3 [simp] :
+"stack_3_1_op v c x  \<noteq>
+    InstructionToWorld act stor bal (Some (nv, n, k))"
+apply(auto simp:stack_3_1_op_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "tl (tl (venv_stack v))")
+apply(auto)
+done
+
+theorem no_return_bits :
+  "instruction_sem v c (Bits x2) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases x2)
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+done
+
+theorem no_return_sarith :
+  "instruction_sem v c (Sarith x2) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases x2)
+apply(auto)
+done
+
+theorem no_return_arith :
+  "instruction_sem v c (Arith x2) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases x2)
+apply(auto simp:sha3_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+done
+
+theorem no_return_info :
+  "instruction_sem v c (Info x2) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases x2)
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+done
+
+theorem umpi_foo :
+ "(if t then Continue x1 y1 z2 else Continue x2 y2 z2) =
+       Return res
+   \<Longrightarrow> False"
+apply(cases t)
+apply(auto)
+done
+
+theorem no_return_dup :
+  "general_dup (unat x2) v c \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(auto)
+apply(cases "index (venv_stack v) (unat x2 - Suc 0)")
+apply(auto)
+done
+
+theorem umpi_umpi : "(if venv_pc v < venv_pc x1
+        then Continue x1 (Suc (nata::nat) - 1) (nt + 1)
+        else Continue x1
+              (program_length (cenv_program c)) nt) =
+       Return
+        (ProgramToWorld act stor bal
+          (Some (nv, Suc nata, Suc nt))) \<Longrightarrow> False"
+apply(cases "venv_pc v < venv_pc x1")
+apply(auto)
+done
+
+declare general_dup_def [simp del]
+
+theorem no_return_memory :
+  "instruction_sem v c (Memory i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(auto)
+apply(cases i)
+apply(auto simp:mstore_def mstore8_def calldatacopy_def
+  codecopy_def extcodecopy_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "tl (tl (venv_stack v))")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "tl (tl (venv_stack v))")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "tl (tl (venv_stack v))")
+apply(auto)
+apply(cases "tl (tl (tl (venv_stack v)))")
+apply(auto)
+done
+
+theorem no_return_storage :
+  "instruction_sem v c (Storage i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases i)
+apply(auto simp:sstore_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+done
+
+fun get_some :: "'a option \<Rightarrow> 'a" where
+"get_some (Some x) = x"
+
+fun get_some_pc :: "inst option \<Rightarrow> pc_inst" where
+"get_some_pc (Some (Pc x)) = x"
+
+
+theorem no_return_blocked [simp] :
+  "blockedInstructionContinue x z \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(auto simp:blockedInstructionContinue_def)
+done
+
+
+theorem no_return_blocked_jump [simp] :
+  "blocked_jump v c z \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(auto simp:blocked_jump_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "program_content (cenv_program c)
+                (unat (hd (venv_stack v)))")
+apply(auto)
+apply(cases "get_some (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+apply(cases "get_some_pc (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+done
+
+theorem no_return_pc :
+  "instruction_sem v c (Pc i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases i)
+apply(auto simp:jumpi_def pc_def  stack_0_0_op_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(cases "program_content (cenv_program c)
+                (unat (hd (venv_stack v)))")
+apply(auto)
+apply(cases "get_some (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+apply(cases "get_some_pc (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+apply(cases "program_content (cenv_program c)
+                (unat (hd (venv_stack v)))")
+apply(auto)
+apply(cases "get_some (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+apply(cases "get_some_pc (program_content (cenv_program c)
+                (unat (hd (venv_stack v))))")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "tl (venv_stack v)")
+apply(auto)
+apply(simp add:strict_if_def)
+apply (metis blockedInstructionContinue_def instruction_result.simps(6) no_return_blocked_jump)
+done
+
+theorem no_return_stack :
+  "instruction_sem v c (Stack i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases i)
+apply(auto simp:pop_def)
+apply(cases "venv_stack v")
+apply(auto)
+apply(cases "venv_stack v")
+apply(auto)
+done
+
+theorem no_return_swap :
+"swap x11 v c \<noteq>
+       InstructionToWorld act stor bal
+        (Some (nv, Suc nata, Suc nt))"
+apply(auto simp:swap_def)
+apply(cases "list_swap x11 (venv_stack v)")
+apply(auto)
+done
+
+theorem no_return_misc :
+  "simple_inst (Misc i) \<Longrightarrow>
+   instruction_sem v c (Misc i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases i)
+apply(auto simp:log_def)
+done
+
+
+theorem no_return_log :
+  "instruction_sem v c (Log i) \<noteq>
+   InstructionToWorld act stor bal (Some (nv,n,k))"
+apply(cases i)
+apply(auto simp:log_def)
+done
+
+theorem no_return_anno :
+  "(if x then InstructionContinue (venv_advance_pc c v)
+        else InstructionAnnotationFailure) \<noteq>
+       InstructionToWorld act stor bal
+        (Some (nv, Suc nata, Suc nt))"
+apply(auto)
+done
+
+theorem no_simple_return :
+ "\<lbrakk> venv_next_instruction v c = Some inst;
+    simple_inst inst \<rbrakk>\<Longrightarrow>
+  program_step c (Continue v n k) \<noteq>
+   Return (ProgramToWorld act stor bal (Some (nv, n, k)))"
+apply(auto simp:program_step.simps)
+apply(cases k)
+apply(auto)
+apply(cases n)
+apply(simp)
+apply(cases "\<not> check_annotations v c")
+apply(simp)
+apply(simp)
+apply(auto)
+apply(cases "instruction_sem v c inst")
+apply(auto)
+apply(rule umpi_umpi)
+apply(auto)
+
+apply(cases inst)
+apply(auto simp:no_return_bits no_return_sarith
+  no_return_arith no_return_info no_return_dup
+  no_return_memory no_return_storage no_return_pc
+  no_return_stack no_return_swap no_return_log
+  no_return_anno no_return_misc)
+done
+
+theorem simple_doesnt_return :
+  "program_step c (Continue v n k) =
+   Return (ProgramToWorld act stor bal (Some (nv, n, k))) \<Longrightarrow>
+   will_return (venv_next_instruction v c)"
+apply(cases "venv_next_instruction v c")
+apply(auto simp:no_simple_return no_inst_error)
+done
+
+theorem expr_stop_aux5 :
+  "program_step c (Continue v n k) =
+   Return (ProgramToWorld act stor bal (Some (nv, n, k))) \<Longrightarrow>
+   venv_next_instruction v c = Some (Misc STOP)"
+
 theorem expr_stop :
   "eval_expr v addr (compile_expr expr) = Some res  \<Longrightarrow>
   \<exists> nv x e1 e2. program_iter
             (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
           Continue nv e1 e2 \<and> 
           venv_next_instruction nv c = Some (Misc STOP)"
-apply(auto)
+apply(auto simp:get_stack_top.simps)
 
 theorem expr_correct :
 "maybe_eq (eval_expr v addr (compile_expr expr)) (get_expr v expr)"
