@@ -1252,10 +1252,255 @@ apply(cases "venv_next_instruction v c")
 apply(auto simp:no_simple_return no_inst_error)
 done
 
+fun is_unknown :: "inst option \<Rightarrow> bool" where
+  "is_unknown (Some (Unknown x)) = True"
+| "is_unknown _ = False"
+ 
+fun is_in_list :: "inst option \<Rightarrow> inst list \<Rightarrow> bool" where
+  "is_in_list (Some (Unknown x)) _ = True"
+| "is_in_list (Some inst) lst = (inst \<in> set lst)"
+| "is_in_list None _ = True"
+
+theorem adding_to_list [simp] :
+  "is_in_list x lst \<Longrightarrow>
+   is_in_list x (i#lst)"
+apply(induction lst)
+apply(cases x)
+apply(auto)
+apply(cases "get_some x")
+apply(auto)
+apply(cases x)
+apply(auto)
+apply(cases "get_some x")
+apply(auto)
+done
+
+(* doesnt work for annotations
+theorem content_aux :
+  "program_content_of_lst t (a # lst) t = Some a"
+apply(induction t arbitrary: a lst)
+apply(auto)
+*)
+
+(* Instead of map, make a list first *)
+fun  program_list_of_lst  :: "inst list \<Rightarrow> inst list"  where 
+ " program_list_of_lst [] = []"
+|" program_list_of_lst (Stack (PUSH_N bytes) # rest) =
+   map(\<lambda>x. Unknown x) bytes @ 
+   [Stack (PUSH_N bytes)] @
+   program_list_of_lst rest"
+|" program_list_of_lst (Annotation _  # rest) = program_list_of_lst rest"
+|" program_list_of_lst (i # rest) = i # program_list_of_lst rest" 
+
+theorem content_small_aux_bytes [simp] :
+  "k < pos \<Longrightarrow>
+   m k = None \<Longrightarrow>
+   store_byte_list_in_program (Suc pos) lst m k = None"
+apply(induction lst arbitrary:pos k m)
+apply(auto)
+done
+
+theorem content_small_aux_stack [simp] :
+ "(\<And>pos k.
+           k < pos \<Longrightarrow>
+           program_content_of_lst pos lst k = None) \<Longrightarrow>
+       k < pos \<Longrightarrow>
+       a = Stack x10 \<Longrightarrow>
+       program_content_of_lst pos (Stack x10 # lst) k =
+       None"
+apply(cases x10)
+apply(auto)
+done
+
+theorem content_small_aux [simp] :
+"(\<And>pos k.
+           k < pos \<Longrightarrow>
+           program_content_of_lst pos lst k = None) \<Longrightarrow>
+       k < pos \<Longrightarrow>
+       program_content_of_lst pos (a # lst) k = None"
+apply(cases a)
+apply(auto)
+done
+
+theorem content_small [simp] :
+   "k < pos \<Longrightarrow> program_content_of_lst pos lst k = None"
+apply(induction lst arbitrary:pos k)
+apply(auto)
+done
+
+theorem update_add :
+   "m k = None \<Longrightarrow>
+    insert x (ran m) = ran (map_update k x m)"
+apply(auto)
+done
+
+theorem ran_blargh :
+  "m1 = m2 \<Longrightarrow> ran m1 = ran m2"
+apply(auto)
+done
+
+theorem update_add2 :
+   "m k = None \<Longrightarrow>
+    insert x (ran m) =
+    ran (\<lambda>a. if a = k then Some x else m a)"
+apply(subst update_add)
+apply(blast)
+apply(rule ran_blargh)
+apply(auto)
+done
+
+fun make_unknown :: "nat \<Rightarrow> byte list \<Rightarrow> (nat,inst) map" where
+ "make_unknown pos [] = empty"
+|"make_unknown pos (a#t) =
+    map_update pos (Unknown a) (make_unknown (pos+1) t)"
+
+theorem make_small [simp] :
+  "k < pos \<Longrightarrow> make_unknown pos bytes k = None"
+apply(induction bytes arbitrary:pos k)
+apply(auto)
+done
+
+theorem unfold_update :
+   "(m(pos \<mapsto> a)) x = (if x = pos then Some a else m x)"
+apply(auto)
+done
+
+theorem make_unknown_lemma :
+  "m2 pos = None \<Longrightarrow>
+   m1(pos \<mapsto> a) ++ m2 = (m1 ++ m2)(pos \<mapsto> a)"
+apply(subst map_add_def)
+apply(subst map_add_def)
+apply(subst unfold_update)
+apply(auto)
+done
+
+theorem program_list_bytes [simp] :
+  "store_byte_list_in_program pos bytes m =
+   m ++ make_unknown pos bytes"
+apply(induction bytes arbitrary: pos m)
+apply(auto simp:make_unknown_lemma)
+done
+
+theorem unknown_union :
+  "(\<forall>k. k < pos + length bytes \<longrightarrow>  m k = None) \<Longrightarrow>
+    ran (m ++ make_unknown pos bytes) =
+    ran m \<union> Unknown ` set bytes"
+apply(induction bytes arbitrary: pos m)
+apply(auto)
+done
+
+theorem more_lemmas :
+"insert x
+        (Unknown ` set bytes \<union>
+         ran
+          (program_content_of_lst
+            (Suc (pos + length bytes)) rest)) =
+       ran
+        (program_content_of_lst
+          (Suc (pos + length bytes)) rest
+         (pos \<mapsto> x) ++
+         make_unknown (Suc pos) bytes)"
+apply(subst make_unknown_lemma)
+apply(auto simp:unknown_union)
+done
+
+theorem program_list_content :
+  "set (program_list_of_lst lst) = ran (program_content_of_lst 0 lst)"
+apply(induction lst rule:program_content_of_lst.induct)
+apply(simp)
+apply(simp)
+defer
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(simp)
+apply(simp)
+apply(rule update_add2)
+apply(auto simp:more_lemmas)
+done
+
+theorem content_unknown :
+  "is_in_list (program_content_of_lst t lst n) lst"
+(*
+apply(induction lst arbitrary:t
+        rule:program_content_of_lst.induct)
+apply(auto)
+*)
+apply(induction lst arbitrary:t n)
+apply(auto)
+
+theorem inst_or_unknown1 :
+  "\<not> is_unknown a \<Longrightarrow>
+  venv_next_instruction v (|
+   cenv_program = program_of_lst prog,
+   cenv_this = addr |) = Some a \<Longrightarrow>
+   a \<in> set prog"
+apply(cases a)
+
+theorem inst_or_unknown :
+  "venv_next_instruction v (|
+   cenv_program = program_of_lst prog,
+   cenv_this = addr |) \<noteq> None \<Longrightarrow>
+  is_unknown (get_some (venv_next_instruction v \<lparr>
+    cenv_program = program_of_lst prog,
+    cenv_this = addr \<rparr>)) \<Longrightarrow>
+  get_some (venv_next_instruction v \<lparr>
+    cenv_program = program_of_lst prog,
+    cenv_this = addr \<rparr>) \<in> set prog"
+apply(cases "venv_next_instruction v \<lparr>
+    cenv_program = program_of_lst prog,
+    cenv_this = addr \<rparr>")
+apply(auto)
+
+theorem expr_stop_aux6 :
+  "will_return (venv_next_instruction v (make_prog (compile_expr expr) addr)) \<Longrightarrow>
+  venv_next_instruction v (make_prog (compile_expr expr) addr) =
+     Some (Misc STOP)"
+apply(cases "venv_next_instruction v (make_prog (compile_expr expr) addr)")
+apply(auto)
+
 theorem expr_stop_aux5 :
-  "program_step c (Continue v n k) =
+  "program_step (make_prog (compile_expr expr) addr)
+       (Continue v n k) =
    Return (ProgramToWorld act stor bal (Some (nv, n, k))) \<Longrightarrow>
-   venv_next_instruction v c = Some (Misc STOP)"
+   venv_next_instruction v (make_prog (compile_expr expr) addr) =
+     Some (Misc STOP)"
 
 theorem expr_stop :
   "eval_expr v addr (compile_expr expr) = Some res  \<Longrightarrow>
