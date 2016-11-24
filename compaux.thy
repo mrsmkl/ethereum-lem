@@ -933,7 +933,7 @@ fun will_return :: "inst option \<Rightarrow> bool" where
 
 theorem no_inst_error : "venv_next_instruction v c = None \<Longrightarrow>
   program_step c (Continue v n k) \<noteq>
-   Return (ProgramToWorld act stor bal (Some (nv, n, k)))"
+   Return (ProgramToWorld act stor bal (Some (nv, e1, e2)))"
 apply(auto simp:program_step.simps)
 apply(cases k)
 apply(auto)
@@ -1026,14 +1026,6 @@ apply(cases "venv_stack v")
 apply(auto)
 done
 
-theorem umpi_foo :
- "(if t then Continue x1 y1 z2 else Continue x2 y2 z2) =
-       Return res
-   \<Longrightarrow> False"
-apply(cases t)
-apply(auto)
-done
-
 theorem no_return_dup :
   "general_dup (unat x2) v c \<noteq>
    InstructionToWorld act stor bal (Some (nv,n,k))"
@@ -1042,16 +1034,6 @@ apply(cases "index (venv_stack v) (unat x2 - Suc 0)")
 apply(auto)
 done
 
-theorem umpi_umpi : "(if venv_pc v < venv_pc x1
-        then Continue x1 (Suc (nata::nat) - 1) (nt + 1)
-        else Continue x1
-              (program_length (cenv_program c)) nt) =
-       Return
-        (ProgramToWorld act stor bal
-          (Some (nv, Suc nata, Suc nt))) \<Longrightarrow> False"
-apply(cases "venv_pc v < venv_pc x1")
-apply(auto)
-done
 
 declare general_dup_def [simp del]
 
@@ -1187,7 +1169,7 @@ done
 theorem no_return_swap :
 "swap x11 v c \<noteq>
        InstructionToWorld act stor bal
-        (Some (nv, Suc nata, Suc nt))"
+        (Some (nv, nata, nt))"
 apply(auto simp:swap_def)
 apply(cases "list_swap x11 (venv_stack v)")
 apply(auto)
@@ -1213,7 +1195,26 @@ theorem no_return_anno :
   "(if x then InstructionContinue (venv_advance_pc c v)
         else InstructionAnnotationFailure) \<noteq>
        InstructionToWorld act stor bal
-        (Some (nv, Suc nata, Suc nt))"
+        (Some (nv, nata, nt))"
+apply(auto)
+done
+
+theorem umpi_foo :
+ "(if t then Continue x1 y1 z2 else Continue x2 y2 z2) =
+       Return res
+   \<Longrightarrow> False"
+apply(cases t)
+apply(auto)
+done
+
+theorem umpi_umpi : "(if venv_pc v < venv_pc x1
+        then Continue x1 (Suc (nata::nat) - 1) (nt + 1)
+        else Continue x1
+              (program_length (cenv_program c)) nt) =
+       Return
+        (ProgramToWorld act stor bal
+          (Some (nv, e1, e2))) \<Longrightarrow> False"
+apply(cases "venv_pc v < venv_pc x1")
 apply(auto)
 done
 
@@ -1221,7 +1222,7 @@ theorem no_simple_return :
  "\<lbrakk> venv_next_instruction v c = Some inst;
     simple_inst inst \<rbrakk>\<Longrightarrow>
   program_step c (Continue v n k) \<noteq>
-   Return (ProgramToWorld act stor bal (Some (nv, n, k)))"
+   Return (ProgramToWorld act stor bal (Some (nv, e1, e2)))"
 apply(auto simp:program_step.simps)
 apply(cases k)
 apply(auto)
@@ -1234,7 +1235,7 @@ apply(auto)
 apply(cases "instruction_sem v c inst")
 apply(auto)
 apply(rule umpi_umpi)
-apply(auto)
+apply(blast)
 
 apply(cases inst)
 apply(auto simp:no_return_bits no_return_sarith
@@ -1246,7 +1247,7 @@ done
 
 theorem simple_doesnt_return :
   "program_step c (Continue v n k) =
-   Return (ProgramToWorld act stor bal (Some (nv, n, k))) \<Longrightarrow>
+   Return (ProgramToWorld act stor bal (Some (nv, e1, e2))) \<Longrightarrow>
    will_return (venv_next_instruction v c)"
 apply(cases "venv_next_instruction v c")
 apply(auto simp:no_simple_return no_inst_error)
@@ -1455,31 +1456,73 @@ apply(rule update_add2)
 apply(auto simp:more_lemmas)
 done
 
+theorem content_unknown_aux :
+  "inst \<in> set (program_list_of_lst lst) \<Longrightarrow>
+   is_in_list (Some inst) lst"
+apply(induction lst arbitrary:inst rule:program_list_of_lst.induct)
+apply(auto simp:program_list_content)
+done
+
+theorem content_unknown_aux2 :
+  "inst \<in> ran (program_content_of_lst 0 lst) \<Longrightarrow>
+   is_in_list (Some inst) lst"
+apply(rule content_unknown_aux)
+apply(auto simp:program_list_content)
+done
+
 theorem content_unknown :
-  "is_in_list (program_content_of_lst t lst n) lst"
-(*
-apply(induction lst arbitrary:t
-        rule:program_content_of_lst.induct)
+  "is_in_list (program_content_of_lst 0 lst n) lst"
+apply(cases "program_content_of_lst 0 lst n")
 apply(auto)
-*)
-apply(induction lst arbitrary:t n)
+apply(rule content_unknown_aux2)
+apply(auto simp:Map.ranI)
+done
+
+theorem content_unknown_some :
+  "program_content_of_lst 0 lst n = Some inst \<Longrightarrow>
+   is_in_list (Some inst) lst"
+apply(auto simp:content_unknown_aux2 Map.ranI)
+done
+
+theorem in_list_unknown :
+ "(is_unknown (Some inst) \<or> inst \<in> set lst) = 
+  is_in_list (Some inst) lst"
+apply(cases inst)
 apply(auto)
+done
+
+theorem content_unknown_some2 :
+  "program_content_of_lst 0 lst n = Some inst \<Longrightarrow>
+   is_unknown (Some inst) \<or> inst \<in> set lst"
+apply(subst in_list_unknown)
+apply(rule content_unknown_some)
+apply(blast)
+done
+
+theorem inst_or_unknown1_aux :
+  "\<not> is_unknown (Some inst) \<Longrightarrow>
+   program_content_of_lst 0 lst n = Some inst \<Longrightarrow>
+   inst \<in> set lst"
+apply(metis content_unknown_some2)
+done
 
 theorem inst_or_unknown1 :
-  "\<not> is_unknown a \<Longrightarrow>
+  "\<not> is_unknown (Some a) \<Longrightarrow>
   venv_next_instruction v (|
    cenv_program = program_of_lst prog,
    cenv_this = addr |) = Some a \<Longrightarrow>
    a \<in> set prog"
 apply(cases a)
+apply(auto simp:inst_or_unknown1_aux)
+done
 
 theorem inst_or_unknown :
   "venv_next_instruction v (|
    cenv_program = program_of_lst prog,
    cenv_this = addr |) \<noteq> None \<Longrightarrow>
-  is_unknown (get_some (venv_next_instruction v \<lparr>
+  \<not>is_unknown (venv_next_instruction v \<lparr>
     cenv_program = program_of_lst prog,
-    cenv_this = addr \<rparr>)) \<Longrightarrow>
+    cenv_this = addr \<rparr>) \<Longrightarrow>
   get_some (venv_next_instruction v \<lparr>
     cenv_program = program_of_lst prog,
     cenv_this = addr \<rparr>) \<in> set prog"
@@ -1487,28 +1530,166 @@ apply(cases "venv_next_instruction v \<lparr>
     cenv_program = program_of_lst prog,
     cenv_this = addr \<rparr>")
 apply(auto)
+apply(rule inst_or_unknown1)
+apply(auto)
+done
+
+theorem expr_stop_aux7 :
+  "\<not> simple_inst a \<Longrightarrow>
+   a \<in> set (compile_expr expr @ [Misc STOP]) \<Longrightarrow>
+   a = Misc STOP"
+apply(auto simp:compiled_simple)
+done
+
+theorem expr_stop_aux8 :
+  "\<not> simple_inst a \<Longrightarrow>
+   program_content_of_lst 0 lst x = Some a \<Longrightarrow>
+   a \<in> set lst"
+by (metis content_unknown is_in_list.simps(13) simple_inst.elims(3))
 
 theorem expr_stop_aux6 :
   "will_return (venv_next_instruction v (make_prog (compile_expr expr) addr)) \<Longrightarrow>
   venv_next_instruction v (make_prog (compile_expr expr) addr) =
      Some (Misc STOP)"
 apply(cases "venv_next_instruction v (make_prog (compile_expr expr) addr)")
-apply(auto)
+apply(auto simp:make_prog_def content_unknown_some2)
+apply(rule_tac  expr = expr in expr_stop_aux7)
+apply(blast)
+apply(rule expr_stop_aux8)
+apply(blast)
+apply(blast)
+done
 
 theorem expr_stop_aux5 :
   "program_step (make_prog (compile_expr expr) addr)
        (Continue v n k) =
-   Return (ProgramToWorld act stor bal (Some (nv, n, k))) \<Longrightarrow>
+   Return (ProgramToWorld act stor bal (Some (nv, e1, e2))) \<Longrightarrow>
    venv_next_instruction v (make_prog (compile_expr expr) addr) =
      Some (Misc STOP)"
+apply(rule expr_stop_aux6)
+using simple_doesnt_return by blast
+
+theorem inst_expr_stop1 :
+"eval_expr v addr (compile_expr expr) = Some res  \<longrightarrow>
+  (\<exists>steps act stor bal nv n k. program_iter
+       (make_prog (compile_expr expr) addr)
+           (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100)
+       steps = Return (ProgramToWorld act stor bal (Some (nv, n, k))))"
+using expr_stop_aux4 by blast
+
+theorem inst_expr_stop2 :
+"program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100)
+       steps = Return st \<Longrightarrow>
+(\<exists> nv x e1 e2. program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
+       Continue nv e1 e2 \<and>
+       program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return st)"
+using last_iter by blast
+
+theorem inst_expr_stop2b :
+"program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100)
+       steps = Return (ProgramToWorld act stor bal (Some (nv2, n, k))) \<longrightarrow>
+(\<exists>nv x e1 e2. program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
+       Continue nv e1 e2 \<and>
+       program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k))))"
+using inst_expr_stop2
+apply(blast)
+done
+
+theorem inst_expr_stop2c :
+"program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100)
+       steps = Return (ProgramToWorld act stor bal (Some (nv2, n, k))) \<Longrightarrow>
+(\<exists>act stor bal nv2 n k nv x e1 e2. program_iter
+       (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
+       Continue nv e1 e2 \<and>
+       program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k))))"
+by (metis inst_expr_stop2)
+
+theorem inst_expr_stop_1_2 :
+"eval_expr v addr (compile_expr expr) = Some res \<longrightarrow>
+(\<exists>act stor bal nv2 n k nv x e1 e2 . program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and>
+       program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k))))"
+using inst_expr_stop2c
+using inst_expr_stop1
+apply(fastforce)
+done
+
+declare venv_next_instruction_def [simp del]
+
+theorem inst_expr_stop3 :
+  "program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<Longrightarrow>
+   program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k))) \<Longrightarrow>
+   program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and> 
+       venv_next_instruction nv (make_prog (compile_expr expr) addr) = Some (Misc STOP)"
+apply(auto)
+apply(auto simp:expr_stop_aux5)
+done
+
+theorem inst_expr_stop3b :
+  "program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and>
+   program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k))) \<Longrightarrow>
+   \<exists> nv x e1 e2. program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and> 
+       venv_next_instruction nv (make_prog (compile_expr expr) addr) = Some (Misc STOP)"
+using inst_expr_stop3
+apply(blast)
+done
+
+declare eval_expr_def [simp del]
+
+theorem inst_expr_stop3c :
+  "\<exists>act stor bal nv2 n k nv x e1 e2 . (program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and>
+   program_step (make_prog (compile_expr expr) addr) (Continue nv e1 e2) =
+        Return (ProgramToWorld act stor bal (Some (nv2, n, k)))) \<Longrightarrow>
+   \<exists> nv x e1 e2. program_iter
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and> 
+       venv_next_instruction nv (make_prog (compile_expr expr) addr) = Some (Misc STOP)"
+using inst_expr_stop3b
+apply(blast)
+done
+
+theorem inst_expr_stop4 :
+  "eval_expr v addr (compile_expr expr) = Some res \<Longrightarrow>
+   \<exists>nv e1 e2 x. program_iter (make_prog (compile_expr expr) addr)
+     (Continue (v\<lparr>venv_pc := 0\<rparr>) 100 100) x =
+    Continue nv e1 e2"
+using inst_expr_stop_1_2
+apply(blast)
+done
 
 theorem expr_stop :
   "eval_expr v addr (compile_expr expr) = Some res  \<Longrightarrow>
   \<exists> nv x e1 e2. program_iter
-            (make_prog (compile_expr expr) addr) (Continue v 100 100) x =
-          Continue nv e1 e2 \<and> 
-          venv_next_instruction nv c = Some (Misc STOP)"
-apply(auto simp:get_stack_top.simps)
+       (make_prog (compile_expr expr) addr) (Continue (v\<lparr> venv_pc := 0 \<rparr>) 100 100) x =
+       Continue nv e1 e2 \<and> 
+       venv_next_instruction nv (make_prog (compile_expr expr) addr) = Some (Misc STOP)"
+apply(rule inst_expr_stop3c)
+using inst_expr_stop_1_2
+apply(blast)
+done
+
 
 theorem expr_correct :
 "maybe_eq (eval_expr v addr (compile_expr expr)) (get_expr v expr)"
